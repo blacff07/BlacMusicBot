@@ -77,8 +77,6 @@ preload = PreloadManager()
 from BlacMusic.helpers import Queue
 queue = Queue()
 
-from BlacMusic.core.calls import TgCall
-tune = TgCall()
 
 
 async def stop() -> None:
@@ -95,3 +93,7 @@ async def stop() -> None:
     await userbot.exit()
     await db.close()
     logger.info("✅ Bot stopped successfully.\n")
+
+# Imported last to avoid circular import with _autoplay
+from BlacMusic.core.calls import TgCall
+tune = TgCall()
