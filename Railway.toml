@@ -1,0 +1,8 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python -m BlacMusic"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
