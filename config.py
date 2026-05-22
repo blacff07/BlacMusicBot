@@ -1,17 +1,36 @@
 # ==============================================================================
 # config.py - Bot Configuration Manager
 # ==============================================================================
-# All settings load from environment variables (.env file).
-# Required variables are validated on startup.
-# Optional variables have sensible defaults.
-# Watermark/branding is fully configurable via env.
+# BOT_NAME is fetched live from Telegram at startup using the BOT_TOKEN.
+# All other branding has sensible defaults — override via env if needed.
 # ==============================================================================
 
+import httpx
 from os import getenv
 from typing import List
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def _fetch_bot_name(token: str) -> str:
+    """
+    Fetch the bot's real first_name from Telegram's getMe endpoint.
+    Falls back to '˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼' if the request fails for any reason.
+    """
+    if not token:
+        return "˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼"
+    try:
+        r = httpx.get(
+            f"https://api.telegram.org/bot{token}/getMe",
+            timeout=10,
+        )
+        data = r.json()
+        if data.get("ok"):
+            return data["result"].get("first_name", "˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼")
+    except Exception:
+        pass
+    return "˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼"
 
 
 class Config:
@@ -33,14 +52,33 @@ class Config:
         self.SESSION2: str = getenv("STRING_SESSION2", "")
         self.SESSION3: str = getenv("STRING_SESSION3", "")
 
-        # ── BRANDING (fully configurable, safe defaults) ──────────────────────
-        self.BOT_NAME: str    = getenv("BOT_NAME",    "˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼")
-        self.BOT_ABOUT: str   = getenv("BOT_ABOUT",   "ꜱᴛᴜᴅɪᴏ-ǫᴜᴀʟɪᴛʏ ᴍᴜꜱɪᴄ ꜱᴛʀᴇᴀᴍɪɴɢ ꜰᴏʀ ᴛᴇʟᴇɢʀᴀᴍ")
-        self.SOURCE_URL: str  = getenv("SOURCE_URL",  "https://github.com/blacmusic/BlacMusicBot")
+        # ── BRANDING ──────────────────────────────────────────────────────────
+        # BOT_NAME: fetched live from Telegram — no env needed.
+        # Override via BOT_NAME env only if you want a custom display name
+        # different from what BotFather shows.
+        self.BOT_NAME: str = getenv("BOT_NAME") or _fetch_bot_name(self.BOT_TOKEN)
+
+        self.BOT_ABOUT: str = getenv(
+            "BOT_ABOUT",
+            "🎵 ʏᴏᴜʀ ᴠɪʙᴇ. ʏᴏᴜʀ ᴍᴜꜱɪᴄ. ᴀɴʏᴛɪᴍᴇ.\n"
+            "ꜱᴛʀᴇᴀᴍɪɴɢ ꜱᴛᴜᴅɪᴏ-ǫᴜᴀʟɪᴛʏ ᴀᴜᴅɪᴏ ᴅɪʀᴇᴄᴛʟʏ ɪɴᴛᴏ\n"
+            "ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ — ꜱᴍᴏᴏᴛʜ, ꜰᴀꜱᴛ & ꜰʀᴇᴇ. 🖤",
+        )
+
+        self.SOURCE_URL: str = getenv(
+            "SOURCE_URL",
+            "https://github.com/blacff07/BlacMusicBot",
+        )
 
         # ── SUPPORT LINKS ─────────────────────────────────────────────────────
-        self.SUPPORT_CHANNEL: str = getenv("SUPPORT_CHANNEL", "https://t.me/blacmusic")
-        self.SUPPORT_CHAT: str    = getenv("SUPPORT_CHAT",    "https://t.me/blacmusicchat")
+        self.SUPPORT_CHANNEL: str = getenv(
+            "SUPPORT_CHANNEL",
+            "https://t.me/TechTipsCode",
+        )
+        self.SUPPORT_CHAT: str = getenv(
+            "SUPPORT_CHAT",
+            "https://t.me/SarangCafes",
+        )
 
         # ── IMAGES (all overridable) ──────────────────────────────────────────
         self.DEFAULT_THUMB: str = getenv("DEFAULT_THUMB", "https://files.catbox.moe/kgrs8f.png")
@@ -64,7 +102,7 @@ class Config:
         self.COOKIES_URL: List[str] = self._parse_cookies()
 
         # ── MODERATION ────────────────────────────────────────────────────────
-        self.EXCLUDED_CHATS: List[int]    = self._parse_excluded_chats()
+        self.EXCLUDED_CHATS: List[int]     = self._parse_excluded_chats()
         self.EXCLUDED_USERNAMES: List[str] = getenv("EXCLUDED_USERNAMES", "").split()
 
     # ── helpers ───────────────────────────────────────────────────────────────
