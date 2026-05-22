@@ -1,7 +1,7 @@
 # ==============================================================================
 # requirements.txt - Python Dependencies
 # ==============================================================================
-# This file lists all Python packages required for ˹ʜᴀꜱɪɪ ᴍᴜꜱɪᴄ˼.
+# This file lists all Python packages required for ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼.
 
 # Installation: pip install -r requirements.txt
  
@@ -13,7 +13,7 @@
 # - pymongo: MongoDB database driver
 # - pytgcrypto: Telegram encryption layer
 # - py-tgcalls: Voice chat streaming library
-# - py-yt-search: YouTube search without API
+# - youtube-search-python: YouTube search without API
 # - python-dotenv: Load environment variables from .env
 # - yt-dlp: YouTube video/audio downloader
 # ==============================================================================
@@ -25,7 +25,7 @@ psutil~=7.2.1
 pymongo~=4.15.5
 pytgcrypto~=1.2.11
 py-tgcalls~=2.2.8
-py-yt-search~=0.5.5
+youtube-search-python~=0.5.5
 python-dotenv~=1.2.1
 yt-dlp[default]>=2026.3.17
 
