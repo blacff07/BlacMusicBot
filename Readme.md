@@ -15,7 +15,7 @@
 
 <br/>
 
-[**Support Channel**](https://t.me/TechTipsCode) · [**Support Chat**](https://t.me/SarangCafes) · [**Source Code**](https://github.com/blaceff07/BlacMusicBot)
+[**Support Channel**](https://t.me/TechTipsCode) · [**Support Chat**](https://t.me/SarangCafes) · [**Source Code**](https://github.com/blacff07/BlacMusicBot)
 
 </div>
 
@@ -153,7 +153,7 @@ sudo apt install -y python3 python3-pip python3-venv ffmpeg git curl
 #### Step 2 — Clone the repository
 
 ```bash
-git clone https://github.com/blaceff07/BlacMusicBot.git
+git clone https://github.com/blacff07/BlacMusicBot.git
 cd BlacMusicBot
 ```
 
@@ -349,7 +349,7 @@ This project is licensed under the **MIT License** — see [LICENSE](LICENSE) fo
 
 **˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼**
 
-[Channel](https://t.me/TechTipsCode) · [Support](https://t.me/SarangCafes) · [GitHub](https://github.com/blaceff07/BlacMusicBot)
+[Channel](https://t.me/TechTipsCode) · [Support](https://t.me/SarangCafes) · [GitHub](https://github.com/blacff07/BlacMusicBot)
 
 *Built for quality. Hosted for free.*
 
