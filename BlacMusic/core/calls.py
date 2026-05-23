@@ -285,7 +285,19 @@ class TgCall(PyTgCalls):
                 except (exceptions.NoActiveGroupCall, errors.RPCError) as e:
                     error_msg = str(e)
                     if "GROUPCALL_INVALID" in error_msg or "GROUPCALL" in error_msg or isinstance(e, exceptions.NoActiveGroupCall):
-                        if attempt < max_retries - 1:
+                        if attempt == 0:
+                            # First attempt: try to start the voice chat via assistant
+                            logger.debug(f"No active VC in {chat_id} — attempting to create one via assistant...")
+                            try:
+                                _pyrogram_client = await db.get_client(chat_id)
+                                await _pyrogram_client.create_video_chat(chat_id)
+                                await asyncio.sleep(1.5)
+                                logger.info(f"✅ Voice chat created in {chat_id}")
+                            except Exception as vc_err:
+                                logger.warning(f"⚠️ Could not create VC in {chat_id}: {vc_err}")
+                                await asyncio.sleep(retry_delay)
+                            continue
+                        elif attempt < max_retries - 1:
                             logger.debug(
                                 f"Group call transitioning for {chat_id}, retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries})")
                             await asyncio.sleep(retry_delay)
