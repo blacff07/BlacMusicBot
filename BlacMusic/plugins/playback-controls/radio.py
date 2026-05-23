@@ -13,6 +13,29 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _resolve_stream(url: str) -> str | None:
+    """Extract direct stream URL from any URL using yt-dlp (handles m3u8, redirects, playlists)."""
+    try:
+        import yt_dlp
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "format": "bestvideo+bestaudio/bestvideo/bestaudio/best",
+            "noplaylist": True,
+            "socket_timeout": 15,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if not info:
+                return None
+            manifest = info.get("manifest_url")
+            if manifest:
+                return manifest
+            return info.get("url")
+    except Exception:
+        return None
+
+
 @app.on_message(filters.command(["radio"]) & ~app.bl_users)
 @lang.language()
 async def radio_hndlr(_, m: types.Message, force=False, url=None, cplay=False, video=False) -> None:
@@ -52,13 +75,22 @@ async def radio_hndlr(_, m: types.Message, force=False, url=None, cplay=False, v
         f"<blockquote>📻 ꜱᴇᴀʀᴄʜɪɴɢ ʟɪᴠᴇ ꜱᴛʀᴇᴀᴍ: <b>{query}</b>...</blockquote>"
     )
 
-    # If it's a direct URL, treat as live stream
-    if query.startswith("http://") or query.startswith("https://"):
-        from BlacMusic.helpers._dataclass import Track
-        import time
+    import time as _time
+    from BlacMusic.helpers._dataclass import Track
+
+    # Direct URL — m3u8, icecast, rtmp, http stream
+    is_direct = query.startswith("http://") or query.startswith("https://") or                 query.startswith("rtmp://") or query.startswith("rtsp://") or                 yt.is_network_stream(query)
+
+    if is_direct:
+        # Extract actual stream URL via yt-dlp (handles m3u8, redirects, etc.)
+        resolved = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: _resolve_stream(query)
+        )
+        stream_url = resolved or query  # fallback to raw URL if extraction fails
+
         file = Track(
-            id=str(int(time.time())),
-            title=query,
+            id=str(int(_time.time())),
+            title=query.split("/")[-1][:40] or "Live Radio",
             url=query,
             duration="LIVE",
             duration_sec=0,
@@ -67,17 +99,21 @@ async def radio_hndlr(_, m: types.Message, force=False, url=None, cplay=False, v
             view_count=None,
             message_id=sent.id,
             is_live=True,
-            file_path=query,
+            video=True,   # auto-detect: stream video if available, else audio
+            file_path=stream_url,
         )
     else:
-        # Search YouTube for live stream
-        file = await yt.search(query + " live stream", sent.id)
+        # Search YouTube for live stream — try video first, fallback to audio
+        file = await yt.search(query + " live", sent.id)
+        if not file:
+            file = await yt.search(query + " radio", sent.id)
         if not file:
             return await sent.edit_text(
-                "<blockquote>❌ ɴᴏ ʟɪᴠᴇ ꜱᴛʀᴇᴀᴍ ꜰᴏᴜɴᴅ.\n\n"
-                "ᴛʀʏ ᴀ ᴅɪʀᴇᴄᴛ ꜱᴛʀᴇᴀᴍ ᴜʀʟ ᴏʀ ᴀ ᴅɪꜰꜰᴇʀᴇɴᴛ ꜱᴇᴀʀᴄʜ ᴛᴇʀᴍ.</blockquote>"
+                "<blockquote>❌ ɴᴏ ꜱᴛʀᴇᴀᴍ ꜰᴏᴜɴᴅ.\n\n"
+                "ᴛʀʏ ᴀ ᴅɪʀᴇᴄᴛ ᴜʀʟ ᴏʀ ᴀ ᴅɪꜰꜰᴇʀᴇɴᴛ ꜱᴇᴀʀᴄʜ ᴛᴇʀᴍ.</blockquote>"
             )
         file.is_live = True
+        file.video = True  # prefer video if stream has it
 
     file.user = m.from_user.mention
     file.message_id = sent.id
