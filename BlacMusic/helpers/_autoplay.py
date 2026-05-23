@@ -73,9 +73,9 @@ async def _search_multi(base_query: str, count: int = 3):
     return tracks[:count]
 
 
-async def send_suggestions(chat_id: int, target_chat: int) -> None:
+async def send_suggestions(chat_id: int, target_chat: int, last_msg_id: int = 0) -> None:
     from pyrogram import types as ptypes
-    from BlacMusic import app, db, lang, logger
+    from BlacMusic import app, config, db, logger
 
     last_query = await db.get_last_query(chat_id)
     if not last_query:
@@ -90,18 +90,25 @@ async def send_suggestions(chat_id: int, target_chat: int) -> None:
     if not suggestions:
         return
 
+    # Delete old now-playing message if CLEANUP_MSG is enabled
+    if config.CLEANUP_MSG and last_msg_id:
+        try:
+            await app.delete_messages(chat_id=target_chat, message_ids=last_msg_id)
+        except Exception:
+            pass
+
     buttons = []
     for track in suggestions:
-        label = track.title[:30] + ("…" if len(track.title) > 30 else "")
+        label = track.title[:28] + ("…" if len(track.title) > 28 else "")
         buttons.append([ptypes.InlineKeyboardButton(
-            text=f"🎵 {label}",
+            text=f"🎵  {label}",
             callback_data=f"autoplay_pick {chat_id} {track.id}",
         )])
 
     markup = ptypes.InlineKeyboardMarkup(buttons)
     text = (
-        "<blockquote>🎶 <b>ǫᴜᴇᴜᴇ ᴇᴍᴘᴛɪᴇᴅ</b>\n\n"
-        "ᴛᴀᴘ ᴀ ꜱᴏɴɢ ᴛᴏ ᴋᴇᴇᴘ ᴛʜᴇ ᴠɪʙᴇ ɢᴏɪɴɢ ↓</blockquote>"
+        "✦ ɪɴꜱᴘɪʀᴇᴅ ʙʏ ʏᴏᴜʀ ʟɪꜱᴛᴇɴɪɴɢ —\n"
+        "ʜᴇʀᴇ'ꜱ ᴡʜᴀᴛ ᴡᴇ ᴘɪᴄᴋᴇᴅ ꜰᴏʀ ʏᴏᴜ ✧"
     )
     try:
         await app.send_message(chat_id=target_chat, text=text, reply_markup=markup)
@@ -116,7 +123,7 @@ async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
     if not last_query:
         return
 
-    asyncio.create_task(send_suggestions(chat_id, target_chat))
+    asyncio.create_task(send_suggestions(chat_id, target_chat, last_msg_id=getattr(track, "message_id", 0) if "track" in dir() else 0))
 
     try:
         suggestions = await _search_multi(last_query, count=1)
