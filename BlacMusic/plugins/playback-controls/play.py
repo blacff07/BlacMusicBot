@@ -164,6 +164,12 @@ async def play_hndlr(
                 "ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ɢʀᴏᴜᴘ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴀ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ꜰɪʀꜱᴛ.</blockquote>"
             )
 
+    # Detect mode from command name
+    _cmd = m.command[0].lower()
+    cplay = _cmd.startswith("c")
+    video = _cmd.startswith("v") or _cmd.startswith("cv")
+    force = "force" in _cmd or (len(m.command) > 1 and "-f" in m.command[1:])
+
     # Handle channel play mode
     chat_id = m.chat.id
     message_chat_id = m.chat.id  # Store original group chat ID for thumbnail
