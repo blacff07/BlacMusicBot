@@ -18,7 +18,9 @@ if sys.platform != "win32":
     except Exception:
         pass
 
-from BlacMusic import tune, app, config, db, logger, stop, userbot, yt
+from BlacMusic import app, config, db, logger, stop, userbot, yt
+from BlacMusic.core.calls import TgCall
+tune = TgCall()
 from BlacMusic.plugins import all_modules
 
 
