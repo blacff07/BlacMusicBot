@@ -609,6 +609,7 @@ class TgCall(PyTgCalls):
                 if not media:
                     # ── Autoplay / Suggestion hook ─────────────────────────
                     from BlacMusic.helpers._autoplay import trigger_autoplay, send_suggestions
+                    _last_msg_id = media.message_id if media else 0
                     autoplay_on = await db.get_autoplay(chat_id)
                     if autoplay_on:
                         asyncio.create_task(
@@ -617,7 +618,7 @@ class TgCall(PyTgCalls):
                         return
                     else:
                         asyncio.create_task(
-                            send_suggestions(chat_id, target_chat)
+                            send_suggestions(chat_id, target_chat, last_msg_id=_last_msg_id)
                         )
 
                     if config.AUTO_END:
