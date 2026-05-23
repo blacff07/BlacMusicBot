@@ -33,6 +33,18 @@ def _asyncio_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -
     exc = context.get("exception")
     if isinstance(exc, (ChannelInvalid, asyncio.CancelledError)):
         return
+    # Log unexpected runtime errors to logger group
+    if exc is not None:
+        async def _send():
+            try:
+                from BlacMusic.helpers._utilities import Utilities
+                await Utilities().send_error(exc, context.get("message", "asyncio exception"))
+            except Exception:
+                pass
+        try:
+            loop.create_task(_send())
+        except Exception:
+            pass
     loop.default_exception_handler(context)
 
 
