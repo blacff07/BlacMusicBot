@@ -107,42 +107,78 @@ class Bot(pyrogram.Client):
         logger.info(f"🤖 Bot started successfully as @{self.username}")
 
     async def _set_commands(self) -> None:
-        """Register bot commands in Telegram slash menu."""
-        from pyrogram.types import BotCommand, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats
+        """Register bot commands in Telegram slash menu — all commands by scope."""
+        from pyrogram.types import (
+            BotCommand,
+            BotCommandScopeAllGroupChats,
+            BotCommandScopeAllPrivateChats,
+            BotCommandScopeChat,
+        )
+        from config import Config
+        _cfg = Config()
 
+        # ── Private DM commands ───────────────────────────────────────────────
         private_commands = [
-            BotCommand("start",    "ꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ & ꜱʜᴏᴡ ɪɴꜰᴏ"),
-            BotCommand("ping",     "ᴄʜᴇᴄᴋ ʙᴏᴛ ꜱᴛᴀᴛᴜꜱ & ʟᴀᴛᴇɴᴄʏ"),
-            BotCommand("help",     "ꜱʜᴏᴡ ʜᴇʟᴘ ᴍᴇɴᴜ"),
-            BotCommand("play",     "ᴘʟᴀʏ ᴀ ꜱᴏɴɢ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
-            BotCommand("vplay",    "ᴘʟᴀʏ ᴠɪᴅᴇᴏ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
-            BotCommand("cplay",    "ᴘʟᴀʏ ɪɴ ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ"),
-            BotCommand("radio",    "ꜱᴛʀᴇᴀᴍ ʟɪᴠᴇ ʀᴀᴅɪᴏ"),
-            BotCommand("queue",    "ꜱʜᴏᴡ ᴄᴜʀʀᴇɴᴛ ǫᴜᴇᴜᴇ"),
-            BotCommand("autoplay", "ᴛᴏɢɢʟᴇ ᴀᴜᴛᴏᴘʟᴀʏ"),
+            BotCommand("start",        "ꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ & ꜱʜᴏᴡ ɪɴꜰᴏ"),
+            BotCommand("help",         "ꜱʜᴏᴡ ʜᴇʟᴘ ᴍᴇɴᴜ"),
+            BotCommand("ping",         "ʙᴏᴛ ꜱᴛᴀᴛᴜꜱ & ʟᴀᴛᴇɴᴄʏ"),
+            BotCommand("play",         "ᴘʟᴀʏ ᴀᴜᴅɪᴏ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
+            BotCommand("vplay",        "ᴘʟᴀʏ ᴠɪᴅᴇᴏ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
+            BotCommand("cplay",        "ᴘʟᴀʏ ɪɴ ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ"),
+            BotCommand("radio",        "ʟɪᴠᴇ ʀᴀᴅɪᴏ / ꜱᴛʀᴇᴀᴍ"),
+            BotCommand("queue",        "ꜱʜᴏᴡ ᴄᴜʀʀᴇɴᴛ ǫᴜᴇᴜᴇ"),
+            BotCommand("autoplay",     "ᴛᴏɢɢʟᴇ ᴀᴜᴛᴏᴘʟᴀʏ ᴍᴏᴅᴇ"),
+            BotCommand("stats",        "ʙᴏᴛ ꜱᴛᴀᴛɪꜱᴛɪᴄꜱ"),
         ]
 
+        # ── Group commands ────────────────────────────────────────────────────
         group_commands = [
-            BotCommand("play",     "ᴘʟᴀʏ ᴀ ꜱᴏɴɢ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
-            BotCommand("vplay",    "ᴘʟᴀʏ ᴠɪᴅᴇᴏ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
-            BotCommand("cplay",    "ᴘʟᴀʏ ɪɴ ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ"),
-            BotCommand("radio",    "ꜱᴛʀᴇᴀᴍ ʟɪᴠᴇ ʀᴀᴅɪᴏ"),
-            BotCommand("pause",    "ᴘᴀᴜꜱᴇ ᴘʟᴀʏʙᴀᴄᴋ"),
-            BotCommand("resume",   "ʀᴇꜱᴜᴍᴇ ᴘʟᴀʏʙᴀᴄᴋ"),
-            BotCommand("skip",     "ꜱᴋɪᴘ ᴄᴜʀʀᴇɴᴛ ᴛʀᴀᴄᴋ"),
-            BotCommand("stop",     "ꜱᴛᴏᴘ & ᴄʟᴇᴀʀ ǫᴜᴇᴜᴇ"),
-            BotCommand("queue",    "ꜱʜᴏᴡ ᴄᴜʀʀᴇɴᴛ ǫᴜᴇᴜᴇ"),
-            BotCommand("seek",     "ꜱᴇᴇᴋ ᴛᴏ ᴛɪᴍᴇꜱᴛᴀᴍᴘ"),
-            BotCommand("loop",     "ᴛᴏɢɢʟᴇ ʟᴏᴏᴘ ᴍᴏᴅᴇ"),
-            BotCommand("shuffle",  "ꜱʜᴜꜰꜰʟᴇ ᴛʜᴇ ǫᴜᴇᴜᴇ"),
-            BotCommand("autoplay", "ᴛᴏɢɢʟᴇ ᴀᴜᴛᴏᴘʟᴀʏ"),
-            BotCommand("ping",     "ᴄʜᴇᴄᴋ ʙᴏᴛ ꜱᴛᴀᴛᴜꜱ"),
-            BotCommand("help",     "ꜱʜᴏᴡ ʜᴇʟᴘ ᴍᴇɴᴜ"),
+            BotCommand("play",         "ᴘʟᴀʏ ᴀᴜᴅɪᴏ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
+            BotCommand("vplay",        "ᴘʟᴀʏ ᴠɪᴅᴇᴏ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
+            BotCommand("cplay",        "ᴘʟᴀʏ ɪɴ ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ"),
+            BotCommand("playforce",    "ꜰᴏʀᴄᴇ ᴘʟᴀʏ — ꜱᴋɪᴘ ǫᴜᴇᴜᴇ"),
+            BotCommand("radio",        "ʟɪᴠᴇ ʀᴀᴅɪᴏ / ꜱᴛʀᴇᴀᴍ"),
+            BotCommand("pause",        "ᴘᴀᴜꜱᴇ ᴘʟᴀʏʙᴀᴄᴋ"),
+            BotCommand("resume",       "ʀᴇꜱᴜᴍᴇ ᴘʟᴀʏʙᴀᴄᴋ"),
+            BotCommand("skip",         "ꜱᴋɪᴘ ᴄᴜʀʀᴇɴᴛ ᴛʀᴀᴄᴋ"),
+            BotCommand("stop",         "ꜱᴛᴏᴘ & ᴄʟᴇᴀʀ ǫᴜᴇᴜᴇ"),
+            BotCommand("seek",         "ꜱᴇᴇᴋ ᴛᴏ ᴛɪᴍᴇꜱᴛᴀᴍᴘ"),
+            BotCommand("loop",         "ᴛᴏɢɢʟᴇ ʟᴏᴏᴘ ᴍᴏᴅᴇ"),
+            BotCommand("shuffle",      "ꜱʜᴜꜰꜰʟᴇ ǫᴜᴇᴜᴇ"),
+            BotCommand("queue",        "ꜱʜᴏᴡ ᴄᴜʀʀᴇɴᴛ ǫᴜᴇᴜᴇ"),
+            BotCommand("autoplay",     "ᴛᴏɢɢʟᴇ ᴀᴜᴛᴏᴘʟᴀʏ"),
+            BotCommand("auth",         "ᴀᴜᴛʜᴏʀɪꜱᴇ ᴀ ᴜꜱᴇʀ"),
+            BotCommand("unauth",       "ʀᴇᴠᴏᴋᴇ ᴜꜱᴇʀ ᴀᴜᴛʜ"),
+            BotCommand("channelplay",  "ʟɪɴᴋ / ᴜɴʟɪɴᴋ ᴄʜᴀɴɴᴇʟ"),
+            BotCommand("ping",         "ʙᴏᴛ ꜱᴛᴀᴛᴜꜱ & ʟᴀᴛᴇɴᴄʏ"),
+            BotCommand("help",         "ꜱʜᴏᴡ ʜᴇʟᴘ ᴍᴇɴᴜ"),
+        ]
+
+        # ── Owner-only commands (set for owner's DM specifically) ─────────────
+        owner_commands = private_commands + [
+            BotCommand("broadcast",    "ꜱᴇɴᴅ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴀʟʟ ᴄʜᴀᴛꜱ"),
+            BotCommand("addsudo",      "ᴀᴅᴅ ꜱᴜᴅᴏ ᴜꜱᴇʀ"),
+            BotCommand("rmsudo",       "ʀᴇᴍᴏᴠᴇ ꜱᴜᴅᴏ ᴜꜱᴇʀ"),
+            BotCommand("gban",         "ɢʟᴏʙᴀʟ ʙᴀɴ ᴀ ᴜꜱᴇʀ"),
+            BotCommand("ungban",       "ʟɪꜰᴛ ɢʟᴏʙᴀʟ ʙᴀɴ"),
+            BotCommand("maintenance",  "ᴛᴏɢɢʟᴇ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ ᴍᴏᴅᴇ"),
+            BotCommand("restart",      "ʀᴇꜱᴛᴀʀᴛ ʙᴏᴛ"),
+            BotCommand("logs",         "ɢᴇᴛ ʟᴏɢ ꜰɪʟᴇ"),
+            BotCommand("eval",         "ᴇxᴇᴄᴜᴛᴇ ᴘʏᴛʜᴏɴ ᴄᴏᴅᴇ"),
+            BotCommand("active",       "ꜱʜᴏᴡ ᴀᴄᴛɪᴠᴇ ᴠᴄ ᴄʜᴀᴛꜱ"),
         ]
 
         try:
             await self.set_bot_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
             await self.set_bot_commands(group_commands,   scope=BotCommandScopeAllGroupChats())
+            # Set extended owner commands in owner's DM
+            try:
+                await self.set_bot_commands(
+                    owner_commands,
+                    scope=BotCommandScopeChat(chat_id=_cfg.OWNER_ID)
+                )
+            except Exception:
+                pass
             logger.info("✅ Bot slash commands registered.")
         except Exception as e:
             logger.warning(f"⚠️ Failed to set bot commands: {e}")
