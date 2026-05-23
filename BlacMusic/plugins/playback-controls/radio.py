@@ -13,6 +13,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+async def _safe_edit(msg, text):
+    """Edit message text safely — silently ignore if message was deleted."""
+    try:
+        await msg.edit_text(text)
+    except Exception:
+        pass
+
+
 def _resolve_stream(url: str) -> str | None:
     """Extract direct stream URL from any URL using yt-dlp (handles m3u8, redirects, playlists)."""
     try:
@@ -108,7 +116,7 @@ async def radio_hndlr(_, m: types.Message, force=False, url=None, cplay=False, v
         if not file:
             file = await yt.search(query + " radio", sent.id)
         if not file:
-            return await sent.edit_text(
+            return await _safe_edit(sent, 
                 "<blockquote>❌ ɴᴏ ꜱᴛʀᴇᴀᴍ ꜰᴏᴜɴᴅ.\n\n"
                 "ᴛʀʏ ᴀ ᴅɪʀᴇᴄᴛ ᴜʀʟ ᴏʀ ᴀ ᴅɪꜰꜰᴇʀᴇɴᴛ ꜱᴇᴀʀᴄʜ ᴛᴇʀᴍ.</blockquote>"
             )
@@ -120,7 +128,7 @@ async def radio_hndlr(_, m: types.Message, force=False, url=None, cplay=False, v
 
     if await db.get_call(chat_id):
         pos = queue.add(chat_id, file)
-        return await sent.edit_text(
+        return await _safe_edit(sent, 
             f"<blockquote>📻 <b>ǫᴜᴇᴜᴇᴅ #{pos}</b>\n\n"
             f"▶ <a href='{file.url}'>{file.title}</a>\n"
             f"⏱ LIVE\n"
@@ -131,7 +139,7 @@ async def radio_hndlr(_, m: types.Message, force=False, url=None, cplay=False, v
     try:
         await tune.play_media(chat_id=chat_id, message=sent, media=file)
     except Exception as e:
-        await sent.edit_text(
+        await _safe_edit(sent, 
             f"<blockquote>❌ ꜰᴀɪʟᴇᴅ ᴛᴏ ꜱᴛᴀʀᴛ ꜱᴛʀᴇᴀᴍ.\n\n"
             f"ᴇʀʀᴏʀ: <code>{e}</code>\n\n"
             f"ᴍᴀᴋᴇ ꜱᴜʀᴇ ᴀ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ɪꜱ ᴀᴄᴛɪᴠᴇ ɪɴ ᴛʜɪꜱ ɢʀᴏᴜᴘ.</blockquote>"
