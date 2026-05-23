@@ -20,9 +20,17 @@ from BlacMusic import app, config, db, lang, queue
 from BlacMusic.helpers import Track, buttons, thumb
 
 
-@app.on_message(filters.command(["queue", "playing"]) & filters.group & ~app.bl_users)
+@app.on_message(filters.command(["queue", "playing"]) & ~app.bl_users)
 @lang.language()
 async def _queue_func(_, m: types.Message):
+
+    from pyrogram import enums as _enums
+    if m.chat.type == _enums.ChatType.PRIVATE:
+        return await m.reply_text(
+            "<blockquote>⚠️ <b>ɢʀᴏᴜᴘ ᴏɴʟʏ</b>\n\n"
+            "ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴡᴏʀᴋꜱ ᴏɴʟʏ ɪɴ ɢʀᴏᴜᴘ ᴠᴏɪᴄᴇ ᴄʜᴀᴛꜱ.\n"
+            "ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ɢʀᴏᴜᴘ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴀ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ꜰɪʀꜱᴛ.</blockquote>"
+        )
     # Auto-delete command message
     try:
         await m.delete()
