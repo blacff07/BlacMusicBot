@@ -134,25 +134,14 @@ class TgCall(PyTgCalls):
         except Exception as e:
             logger.warning(f"Error clearing queue/call for {chat_id}: {e}")
 
-        try:
-            await client.leave_call(chat_id, close=False)
-            # Small delay to let group call state stabilize after leaving
-            await asyncio.sleep(0.5)
-        except (ConnectionNotFound, exceptions.NotInCallError):
-            # Expected: userbot is not in a call
-            pass
-        except Exception as e:
-            # Only log unexpected errors
-            error_msg = str(e).lower()
-            if not any(ignore in error_msg for ignore in [
-                "not in a call",
-                "not in the group call",
-                "groupcall_forbidden",
-                "no active group call",
-                "call was already stopped",
-                "call already disconnected"
-            ]):
-                logger.warning(f"Error leaving call for {chat_id}: {e}")
+        # Try all active pytgcalls clients — ensures leave even for TG voice files
+        for _client in self.clients:
+            try:
+                await _client.leave_call(chat_id)
+                await asyncio.sleep(0.3)
+                break  # One successful leave is enough
+            except Exception:
+                pass
 
     async def play_media(
         self,
@@ -607,18 +596,22 @@ class TgCall(PyTgCalls):
                         f"Could not delete previous message in {chat_id}: {e}")
 
                 if not media:
-                    # ── Autoplay / Suggestion hook ─────────────────────────
+                    # ── Queue empty — Autoplay / Suggestion hook ───────────
                     from BlacMusic.helpers._autoplay import trigger_autoplay, send_suggestions
-                    _last_msg_id = media.message_id if media else 0
+
                     autoplay_on = await db.get_autoplay(chat_id)
+                    queue_has_items = bool(queue.get_all(chat_id))
+
                     if autoplay_on:
+                        # Autoplay ON: silently add a related track and keep going
                         asyncio.create_task(
                             trigger_autoplay(chat_id, target_chat)
                         )
-                        return
-                    else:
+                        return  # autoplay takes over, don't stop
+                    elif not queue_has_items:
+                        # Autoplay OFF and queue truly empty: send suggestion strip
                         asyncio.create_task(
-                            send_suggestions(chat_id, target_chat, last_msg_id=_last_msg_id)
+                            send_suggestions(chat_id, target_chat)
                         )
 
                     if config.AUTO_END:
