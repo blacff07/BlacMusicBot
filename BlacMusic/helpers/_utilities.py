@@ -110,18 +110,12 @@ class Utilities:
         """Send runtime errors to logger group as a code block with context."""
         import traceback
         tb = traceback.format_exc()
-        # Truncate if too long — keep last 3000 chars
         if len(tb) > 3000:
-            tb = "...truncated...
-" + tb[-3000:]
+            tb = "...truncated..." + "\n" + tb[-3000:]
         text = (
-            f"<blockquote>⚠️ <b>ʀᴜɴᴛɪᴍᴇ ᴇʀʀᴏʀ</b></blockquote>
-
-"
-            f"<b>ᴄᴏɴᴛᴇxᴛ:</b> <code>{context}</code>
-
-"
-            f"<pre language="python">{tb}</pre>"
+            "<blockquote>⚠️ <b>ʀᴜɴᴛɪᴍᴇ ᴇʀʀᴏʀ</b></blockquote>\n\n"
+            f"<b>ᴄᴏɴᴛᴇxᴛ:</b> <code>{context}</code>\n\n"
+            f"<pre language='python'>{tb}</pre>"
         )
         try:
             await app.send_message(
