@@ -21,7 +21,6 @@ from pytgcalls import PyTgCalls, exceptions, types
 from pytgcalls.pytgcalls_session import PyTgCallsSession
 
 from BlacMusic import app, config, db, lang, logger, preload, queue, userbot, yt
-from BlacMusic.helpers._autoplay import trigger_autoplay, send_suggestions
 from BlacMusic.helpers import Media, Track, buttons, thumb
 
 # Suppress pytgcalls harmless errors (library bugs - not critical)
@@ -609,16 +608,14 @@ class TgCall(PyTgCalls):
 
                 if not media:
                     # ── Autoplay / Suggestion hook ─────────────────────────
+                    from BlacMusic.helpers._autoplay import trigger_autoplay, send_suggestions
                     autoplay_on = await db.get_autoplay(chat_id)
                     if autoplay_on:
-                        # trigger_autoplay: silently queues one related track
-                        # AND sends 3 suggestion buttons — non-blocking
                         asyncio.create_task(
                             trigger_autoplay(chat_id, target_chat)
                         )
-                        return  # don't call stop(); autoplay takes over
+                        return
                     else:
-                        # No autoplay — send suggestion buttons only (no auto-queue)
                         asyncio.create_task(
                             send_suggestions(chat_id, target_chat)
                         )
