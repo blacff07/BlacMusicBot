@@ -498,7 +498,8 @@ class YouTube:
                         # HTTP 416 - file partially downloaded, delete and retry won't help
                         logger.warning(f"⚠️ Range error for {video_id}, skipping")
                     else:
-                        logger.warning(f"⚠️ Download error for {video_id}: {ex}")
+                        if "ffmpeg exited with code 255" not in str(ex):
+                            logger.warning(f"⚠️ Download error for {video_id}: {ex}")
                         if recovered:
                             logger.warning(
                                 f"⚠️ Using recovered file for {video_id} despite download error"
