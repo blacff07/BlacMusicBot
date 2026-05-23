@@ -35,6 +35,11 @@ async def main():
                 importlib.import_module(f"BlacMusic.plugins.{module}")
             except Exception as e:
                 logger.error(f"Failed to load plugin {module}: {e}", exc_info=True)
+                try:
+                    from BlacMusic.helpers._utilities import Utilities
+                    await Utilities().send_error(e, f"Plugin load: {module}")
+                except Exception:
+                    pass
         logger.info(f"🔌 Loaded {len(all_modules)} plugin modules.")
 
         if config.COOKIES_URL:
