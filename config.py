@@ -95,8 +95,11 @@ class Config:
         self.AUTO_END: bool        = self._bool(getenv("AUTO_END",    "False"))
         self.AUTO_LEAVE: bool      = self._bool(getenv("AUTO_LEAVE",  "False"))
         self.THUMB_GEN: bool       = self._bool(getenv("THUMB_GEN",   "True"))
-        self.VIDEO_PLAY: bool      = self._bool(getenv("VIDEO_PLAY",  "False"))
+        self.VIDEO_PLAY: bool      = self._bool(getenv("VIDEO_PLAY",  "True"))
         self.VIDEO_MAX_HEIGHT: int = self._clamp_height()
+
+        # Auto-delete now-playing messages when queue moves to next track
+        self.CLEANUP_MSG: bool     = self._bool(getenv("CLEANUP_MSG", "True"))
 
         # ── YOUTUBE COOKIES ───────────────────────────────────────────────────
         self.COOKIES_URL: List[str] = self._parse_cookies()
