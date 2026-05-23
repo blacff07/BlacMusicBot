@@ -105,9 +105,9 @@ def checkUB(play):
                     f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
                     f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
                     f"<b>Required permissions:</b>\n"
-                    f"• Manage Voice Chats\n"
-                    f"• Invite Users via Link\n"
-                    f"• Delete Messages\n\n"
+                    f" Manage Voice Chats\n"
+                    f" Invite Users via Link\n"
+                    f" Delete Messages\n\n"
                     f"Please promote me as admin with the required permissions.</blockquote>"
                 )
                 return
@@ -128,9 +128,9 @@ def checkUB(play):
                             f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
                             f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
                             f"<b>Required permissions:</b>\n"
-                            f"• Manage Voice Chats\n"
-                            f"• Invite Users via Link\n"
-                            f"• Delete Messages\n\n"
+                            f" Manage Voice Chats\n"
+                            f" Invite Users via Link\n"
+                            f" Delete Messages\n\n"
                             f"Please promote me as admin with the required permissions.</blockquote>"
                         )
                         return
@@ -139,9 +139,9 @@ def checkUB(play):
                             f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
                             f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
                             f"<b>Required permissions:</b>\n"
-                            f"• Manage Voice Chats\n"
-                            f"• Invite Users via Link\n"
-                            f"• Delete Messages\n\n"
+                            f" Manage Voice Chats\n"
+                            f" Invite Users via Link\n"
+                            f" Delete Messages\n\n"
                             f"Please promote me as admin with the required permissions.</blockquote>"
                         )
                         return
@@ -169,9 +169,9 @@ def checkUB(play):
                                     f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
                                     f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
                                     f"<b>Required permissions:</b>\n"
-                                    f"• Manage Voice Chats\n"
-                                    f"• Invite Users via Link\n"
-                                    f"• Delete Messages\n\n"
+                                    f" Manage Voice Chats\n"
+                                    f" Invite Users via Link\n"
+                                    f" Delete Messages\n\n"
                                     f"Please promote me as admin with the required permissions.</blockquote>"
                                 )
                             except:
@@ -194,9 +194,9 @@ def checkUB(play):
                                 f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
                                 f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
                                 f"<b>Required permissions:</b>\n"
-                                f"• Manage Voice Chats\n"
-                                f"• Invite Users via Link\n"
-                                f"• Delete Messages\n\n"
+                                f" Manage Voice Chats\n"
+                                f" Invite Users via Link\n"
+                                f" Delete Messages\n\n"
                                 f"Please promote me as admin with the required permissions.</blockquote>"
                             )
                         except:
