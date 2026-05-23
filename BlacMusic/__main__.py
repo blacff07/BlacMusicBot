@@ -5,6 +5,7 @@
 import asyncio
 import importlib
 import sys
+import logging
 
 from pyrogram import idle
 
@@ -18,9 +19,7 @@ if sys.platform != "win32":
     except Exception:
         pass
 
-from BlacMusic import app, config, db, logger, stop, userbot, yt
-from BlacMusic.core.calls import TgCall
-tune = TgCall()
+from BlacMusic import app, config, db, logger, stop, tune, userbot, yt
 from BlacMusic.plugins import all_modules
 
 
@@ -51,33 +50,25 @@ async def main():
         logger.info(f"👑 Loaded {len(app.sudoers)} sudo users.")
         logger.info("\n🎵 ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼ started successfully! Ready to play.\n")
 
-        try:
-            await idle()
-        except KeyboardInterrupt:
-            logger.info("Received stop signal...")
-        except Exception as e:
-            logger.error(f"Error during idle: {e}", exc_info=True)
+        await idle()
 
-        await stop()
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
     except Exception as e:
-        logger.error(f"Critical error in main: {e}", exc_info=True)
-        raise
+        logger.error(f"Critical error: {e}", exc_info=True)
+    finally:
+        await stop()
 
 
 if __name__ == "__main__":
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user (Ctrl+C)")
+        asyncio.run(main())
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
     except SystemExit as e:
         logger.error(f"Bot exited: {e}")
         raise
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
     finally:
-        try:
-            if loop.is_running():
-                loop.stop()
-        except Exception:
-            pass
+        logging.shutdown()
