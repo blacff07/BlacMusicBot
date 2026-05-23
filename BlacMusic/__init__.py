@@ -1,8 +1,5 @@
 """
 ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼ - Advanced Telegram Music Bot
-
-Main initialization module. Sets up logging, configuration,
-and all core components required for the bot to function.
 """
 
 import asyncio
@@ -34,8 +31,7 @@ logger = logging.getLogger("BlacMusic")
 
 def _asyncio_exception_handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
     exc = context.get("exception")
-    if isinstance(exc, ChannelInvalid):
-        logger.warning("Ignoring CHANNEL_INVALID update (channel probably removed).")
+    if isinstance(exc, (ChannelInvalid, asyncio.CancelledError)):
         return
     loop.default_exception_handler(context)
 
@@ -78,20 +74,38 @@ from BlacMusic.helpers import Queue
 queue = Queue()
 
 
-
 async def stop() -> None:
     logger.info("🛑 Stopping bot...")
     for task in tasks:
         task.cancel()
         try:
-            await task
-        except asyncio.CancelledError:
+            await asyncio.wait_for(asyncio.shield(task), timeout=2)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
             pass
         except Exception:
             pass
-    await app.exit()
-    await userbot.exit()
-    await db.close()
-    logger.info("✅ Bot stopped successfully.\n")
+    try:
+        await app.exit()
+    except Exception:
+        pass
+    try:
+        await userbot.exit()
+    except Exception:
+        pass
+    try:
+        await db.close()
+    except Exception:
+        pass
+    logger.info("✅ Bot stopped successfully.")
 
-# Imported last to avoid circular import with _autoplay
+
+import sys as _sys
+
+def _load_tune():
+    global tune
+    from BlacMusic.core.calls import TgCall
+    tune = TgCall()
+    _sys.modules[__name__].tune = tune
+
+_load_tune()
+del _load_tune, _sys
