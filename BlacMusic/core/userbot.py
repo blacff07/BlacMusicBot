@@ -95,14 +95,15 @@ class Userbot:
         client.username = me.username   if me else None
         client.mention  = me.mention    if me else client.name
 
-        # Non-blocking log message — failure here is not critical
+        # Non-blocking log message via bot (not assistant) — only bot needs to be in logger group
         try:
-            await client.send_message(
+            from BlacMusic import app
+            await app.send_message(
                 config.LOGGER_ID,
                 f"✅ Assistant {num} started as @{client.username}"
             )
         except Exception as e:
-            logger.warning(f"⚠️ Assistant {num} couldn't reach logger group: {e}")
+            logger.warning(f"⚠️ Couldn't send assistant {num} startup log: {e}")
 
         self.clients.append(client)
         logger.info(f"👤 Assistant {num} ready — @{client.username}")
