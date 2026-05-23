@@ -130,6 +130,22 @@ class YouTube:
         else:
             logger.error("❌ No cookies saved! Check COOKIE_URL in .env. YouTube downloads will fail!")
 
+    def is_network_stream(self, url: str) -> bool:
+        """Return True for direct network streams (m3u8, icecast, etc.)."""
+        url = url.lower()
+        return (
+            url.endswith('.m3u8') or
+            url.endswith('.m3u') or
+            '/stream' in url or
+            url.startswith('rtmp://') or
+            url.startswith('rtsp://') or
+            url.startswith('rtp://') or
+            url.startswith('udp://') or
+            '.m3u8?' in url or
+            'icecast' in url or
+            'shoutcast' in url
+        )
+
     def valid(self, url: str) -> bool:
         return bool(re.match(self.regex, url))
 
@@ -288,16 +304,28 @@ class YouTube:
                         if not info:
                             return None
 
+                        # For live: prefer manifest_url (m3u8) for best quality
+                        manifest = info.get("manifest_url")
+                        if manifest:
+                            return manifest
+
                         direct = info.get("url")
                         if direct:
                             return direct
 
-                        # Some live extracts provide URLs only inside formats.
-                        for fmt in info.get("formats", []):
+                        # Pick best format: prefer video+audio, fallback to audio
+                        formats = info.get("formats", [])
+                        best = None
+                        for fmt in reversed(formats):
                             if fmt.get("acodec") != "none" and fmt.get("url"):
-                                return fmt["url"]
+                                if fmt.get("vcodec") not in (None, "none"):
+                                    return fmt["url"]  # video+audio — best
+                                if not best:
+                                    best = fmt["url"]  # audio only fallback
+                        if best:
+                            return best
 
-                        return info.get("manifest_url")
+                        return None
                     except yt_dlp.utils.ExtractorError as ex:
                         error_msg = str(ex)
                         if "not available" in error_msg.lower():
