@@ -102,7 +102,50 @@ class Bot(pyrogram.Client):
                 f"ᴘʟᴇᴀꜱᴇ ᴘʀᴏᴍᴏᴛᴇ ᴛʜᴇ ʙᴏᴛ ᴛᴏ ᴀᴅᴍɪɴɪꜱᴛʀᴀᴛᴏʀ ᴡɪᴛʜ ɴᴇᴄᴇꜱꜱᴀʀʏ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ."
             )
 
+        # Set bot slash commands in Telegram menu
+        await self._set_commands()
         logger.info(f"🤖 Bot started successfully as @{self.username}")
+
+    async def _set_commands(self) -> None:
+        """Register bot commands in Telegram slash menu."""
+        from pyrogram.types import BotCommand, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats
+
+        private_commands = [
+            BotCommand("start",    "ꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ & ꜱʜᴏᴡ ɪɴꜰᴏ"),
+            BotCommand("ping",     "ᴄʜᴇᴄᴋ ʙᴏᴛ ꜱᴛᴀᴛᴜꜱ & ʟᴀᴛᴇɴᴄʏ"),
+            BotCommand("help",     "ꜱʜᴏᴡ ʜᴇʟᴘ ᴍᴇɴᴜ"),
+            BotCommand("play",     "ᴘʟᴀʏ ᴀ ꜱᴏɴɢ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
+            BotCommand("vplay",    "ᴘʟᴀʏ ᴠɪᴅᴇᴏ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
+            BotCommand("cplay",    "ᴘʟᴀʏ ɪɴ ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ"),
+            BotCommand("radio",    "ꜱᴛʀᴇᴀᴍ ʟɪᴠᴇ ʀᴀᴅɪᴏ"),
+            BotCommand("queue",    "ꜱʜᴏᴡ ᴄᴜʀʀᴇɴᴛ ǫᴜᴇᴜᴇ"),
+            BotCommand("autoplay", "ᴛᴏɢɢʟᴇ ᴀᴜᴛᴏᴘʟᴀʏ"),
+        ]
+
+        group_commands = [
+            BotCommand("play",     "ᴘʟᴀʏ ᴀ ꜱᴏɴɢ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
+            BotCommand("vplay",    "ᴘʟᴀʏ ᴠɪᴅᴇᴏ ɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ"),
+            BotCommand("cplay",    "ᴘʟᴀʏ ɪɴ ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ"),
+            BotCommand("radio",    "ꜱᴛʀᴇᴀᴍ ʟɪᴠᴇ ʀᴀᴅɪᴏ"),
+            BotCommand("pause",    "ᴘᴀᴜꜱᴇ ᴘʟᴀʏʙᴀᴄᴋ"),
+            BotCommand("resume",   "ʀᴇꜱᴜᴍᴇ ᴘʟᴀʏʙᴀᴄᴋ"),
+            BotCommand("skip",     "ꜱᴋɪᴘ ᴄᴜʀʀᴇɴᴛ ᴛʀᴀᴄᴋ"),
+            BotCommand("stop",     "ꜱᴛᴏᴘ & ᴄʟᴇᴀʀ ǫᴜᴇᴜᴇ"),
+            BotCommand("queue",    "ꜱʜᴏᴡ ᴄᴜʀʀᴇɴᴛ ǫᴜᴇᴜᴇ"),
+            BotCommand("seek",     "ꜱᴇᴇᴋ ᴛᴏ ᴛɪᴍᴇꜱᴛᴀᴍᴘ"),
+            BotCommand("loop",     "ᴛᴏɢɢʟᴇ ʟᴏᴏᴘ ᴍᴏᴅᴇ"),
+            BotCommand("shuffle",  "ꜱʜᴜꜰꜰʟᴇ ᴛʜᴇ ǫᴜᴇᴜᴇ"),
+            BotCommand("autoplay", "ᴛᴏɢɢʟᴇ ᴀᴜᴛᴏᴘʟᴀʏ"),
+            BotCommand("ping",     "ᴄʜᴇᴄᴋ ʙᴏᴛ ꜱᴛᴀᴛᴜꜱ"),
+            BotCommand("help",     "ꜱʜᴏᴡ ʜᴇʟᴘ ᴍᴇɴᴜ"),
+        ]
+
+        try:
+            await self.set_bot_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
+            await self.set_bot_commands(group_commands,   scope=BotCommandScopeAllGroupChats())
+            logger.info("✅ Bot slash commands registered.")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to set bot commands: {e}")
 
     async def exit(self) -> None:
         """
