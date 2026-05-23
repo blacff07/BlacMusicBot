@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="https://files.catbox.moe/kaujz9.jpg" alt="BlacMusic Banner" width="100%"/>
+
 <br/>
 
 # ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼
