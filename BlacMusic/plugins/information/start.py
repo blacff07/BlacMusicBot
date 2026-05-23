@@ -81,20 +81,22 @@ async def start(_, message: types.Message):
     )
 
     key = buttons.start_key(message.lang, private)
-    try:
-        await message.reply_photo(
-            photo=config.START_IMG,
-            caption=_text,
-            reply_markup=key,
-            quote=not private,
-        )
-    except errors.ChatSendPhotosForbidden:
-        # If photos are not allowed, send text only
-        await message.reply_text(
-            text=_text,
-            reply_markup=key,
-            quote=not private,
-        )
+    if config.START_IMG:
+        try:
+            await message.reply_photo(
+                photo=config.START_IMG,
+                caption=_text,
+                reply_markup=key,
+                quote=not private,
+            )
+            return
+        except Exception:
+            pass
+    await message.reply_text(
+        text=_text,
+        reply_markup=key,
+        quote=not private,
+    )
 
     # For private chats, add user to database if new
     if private:
