@@ -131,14 +131,38 @@ async def play_hndlr(
     except Exception:
         pass
 
-    # DM guard — play commands only work in groups
-    from pyrogram import enums
-    if m.chat.type == enums.ChatType.PRIVATE:
-        return await m.reply_text(
-            "<blockquote>🎵 <b>ᴘʟᴀʏ ᴄᴏᴍᴍᴀɴᴅꜱ ᴡᴏʀᴋ ɪɴ ɢʀᴏᴜᴘꜱ ᴏɴʟʏ</b>\n\n"
-            "ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ɢʀᴏᴜᴘ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴀ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ᴛᴏ ᴘʟᴀʏ ᴍᴜꜱɪᴄ.\n\n"
-            "ᴜꜱᴇ /help ᴛᴏ ꜱᴇᴇ ᴀʟʟ ᴀᴠᴀɪʟᴀʙʟᴇ ᴄᴏᴍᴍᴀɴᴅꜱ.</blockquote>"
-        )
+    # DM guard — command-specific responses
+    from pyrogram import enums as _enums
+    if m.chat.type == _enums.ChatType.PRIVATE:
+        cmd = m.command[0].lower()
+        if cmd.startswith("c"):
+            return await m.reply_text(
+                "<blockquote>📢 <b>/cplay — ᴄʜᴀɴɴᴇʟ ᴘʟᴀʏ</b>\n\n"
+                "ꜱᴛʀᴇᴀᴍꜱ ᴍᴜꜱɪᴄ ɪɴᴛᴏ ʏᴏᴜʀ <b>ʟɪɴᴋᴇᴅ ᴄʜᴀɴɴᴇʟ'ꜱ</b> ᴠᴏɪᴄᴇ ᴄʜᴀᴛ.\n\n"
+                "<b>ꜱᴇᴛᴜᴘ:</b>\n"
+                "1. ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ᴄʜᴀɴɴᴇʟ ᴀꜱ ᴀᴅᴍɪɴ\n"
+                "2. ᴜꜱᴇ <code>/channelplay linked</code> ɪɴ ᴛʜᴇ ɢʀᴏᴜᴘ\n"
+                "3. ᴛʜᴇɴ ᴜꜱᴇ <code>/cplay songname</code>\n\n"
+                "ᴄᴜʀʀᴇɴᴛ ᴄʜᴀɴɴᴇʟ: ᴜꜱᴇ ɪɴ ɢʀᴏᴜᴘ ᴛᴏ ᴄʜᴇᴄᴋ.</blockquote>"
+            )
+        elif cmd.startswith("v"):
+            enabled = config.VIDEO_PLAY
+            return await m.reply_text(
+                "<blockquote>📺 <b>/vplay — ᴠɪᴅᴇᴏ ᴘʟᴀʏ</b>\n\n"
+                f"ꜱᴛᴀᴛᴜꜱ: {'✅ ᴇɴᴀʙʟᴇᴅ' if enabled else '❌ ᴅɪꜱᴀʙʟᴇᴅ'}\n\n"
+                "ꜱᴛʀᴇᴀᴍꜱ ᴠɪᴅᴇᴏ ᴅɪʀᴇᴄᴛʟʏ ɪɴᴛᴏ ɢʀᴏᴜᴘ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ.\n"
+                + ("ᴜꜱᴇ ɪɴ ᴀ ɢʀᴏᴜᴘ ᴡɪᴛʜ ᴀᴄᴛɪᴠᴇ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ." if enabled else
+                   "ᴇɴᴀʙʟᴇ ᴠɪᴅᴇᴏ: ꜱᴇᴛ <code>VIDEO_PLAY=True</code> ɪɴ .ᴇɴᴠ") + "</blockquote>"
+            )
+        else:
+            return await m.reply_text(
+                "<blockquote>🎵 <b>/play — ᴍᴜꜱɪᴄ ᴘʟᴀʏ</b>\n\n"
+                "ꜱᴇᴀʀᴄʜᴇꜱ ʏᴏᴜᴛᴜʙᴇ ᴀɴᴅ ꜱᴛʀᴇᴀᴍꜱ ᴀᴜᴅɪᴏ ɪɴᴛᴏ ɢʀᴏᴜᴘ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ.\n\n"
+                "<b>ᴜꜱᴀɢᴇ:</b>\n"
+                "• <code>/play songname</code>\n"
+                "• <code>/play youtube.com/watch?v=...</code>\n\n"
+                "ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ɢʀᴏᴜᴘ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴀ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ꜰɪʀꜱᴛ.</blockquote>"
+            )
 
     # Handle channel play mode
     chat_id = m.chat.id
