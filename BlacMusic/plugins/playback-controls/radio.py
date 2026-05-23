@@ -7,7 +7,6 @@
 
 from pyrogram import enums, filters, types
 from BlacMusic import app, config, db, lang, tune, queue, yt
-from BlacMusic.helpers._play import checkUB
 import asyncio
 import logging
 
@@ -16,8 +15,7 @@ logger = logging.getLogger(__name__)
 
 @app.on_message(filters.command(["radio"]) & ~app.bl_users)
 @lang.language()
-@checkUB
-async def radio_hndlr(_, m: types.Message) -> None:
+async def radio_hndlr(_, m: types.Message, force=False, url=None, cplay=False, video=False) -> None:
     try:
         await m.delete()
     except Exception:
