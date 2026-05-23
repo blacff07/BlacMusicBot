@@ -81,7 +81,14 @@ def checkUB(play):
         if m.chat.id not in db.active_calls:
             client = await db.get_client(m.chat.id)
             try:
-                member = await app.get_chat_member(m.chat.id, client.id)
+                try:
+                    member = await app.get_chat_member(m.chat.id, client.id)
+                except errors.PeerIdInvalid:
+                    # Bot doesn't know assistant peer yet — resolve via username
+                    if client.username:
+                        member = await app.get_chat_member(m.chat.id, client.username)
+                    else:
+                        raise
                 if member.status in [
                     enums.ChatMemberStatus.BANNED,
                     enums.ChatMemberStatus.RESTRICTED,
@@ -100,6 +107,39 @@ def checkUB(play):
                             )
                         )
                         return
+            except errors.PeerIdInvalid:
+                # Assistant hasn't seen this peer yet — join then re-check immediately
+                joined = False
+                try:
+                    invite_link = (await app.get_chat(m.chat.id)).invite_link
+                    if not invite_link:
+                        invite_link = await app.export_chat_invite_link(m.chat.id)
+                    await client.join_chat(invite_link)
+                    joined = True
+                except Exception:
+                    pass
+                if not joined:
+                    await safe_reply(
+                        "<blockquote>❌ ᴀꜱꜱɪꜱᴛᴀɴᴛ ᴄᴏᴜʟᴅɴ'ᴛ ᴊᴏɪɴ ᴛʜɪꜱ ᴄʜᴀᴛ.\n"
+                        "ᴘʟᴇᴀꜱᴇ ᴍᴀᴋᴇ ᴛʜᴇ ɢʀᴏᴜᴘ ᴘᴜʙʟɪᴄ ᴏʀ ᴀᴅᴅ ᴛʜᴇ ᴀꜱꜱɪꜱᴛᴀɴᴛ ᴍᴀɴᴜᴀʟʟʏ.</blockquote>"
+                    )
+                    return
+                # Re-check member status after joining — then fall through to play
+                try:
+                    member = await app.get_chat_member(m.chat.id, client.id)
+                    if member.status in [
+                        enums.ChatMemberStatus.BANNED,
+                        enums.ChatMemberStatus.RESTRICTED,
+                    ]:
+                        await safe_reply(
+                            m.lang["play_banned"].format(
+                                app.name, client.id, client.mention,
+                                f"@{client.username}" if client.username else None,
+                            )
+                        )
+                        return
+                except Exception:
+                    pass  # Joined successfully, proceed to play
             except errors.ChatAdminRequired:
                 await safe_reply(
                     f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
