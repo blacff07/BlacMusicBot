@@ -18,10 +18,18 @@ from BlacMusic import app, db, lang, queue
 from BlacMusic.helpers import can_manage_vc
 
 
-@app.on_message(filters.command(["shuffle"]) & filters.group & ~app.bl_users)
+@app.on_message(filters.command(["shuffle"]) & ~app.bl_users)
 @lang.language()
 @can_manage_vc
 async def _shuffle(_, m: types.Message):
+
+    from pyrogram import enums as _enums
+    if m.chat.type == _enums.ChatType.PRIVATE:
+        return await m.reply_text(
+            "<blockquote>⚠️ <b>ɢʀᴏᴜᴘ ᴏɴʟʏ</b>\n\n"
+            "ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴡᴏʀᴋꜱ ᴏɴʟʏ ɪɴ ɢʀᴏᴜᴘ ᴠᴏɪᴄᴇ ᴄʜᴀᴛꜱ.\n"
+            "ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ɢʀᴏᴜᴘ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴀ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ꜰɪʀꜱᴛ.</blockquote>"
+        )
     # Auto-delete command message
     try:
         await m.delete()
