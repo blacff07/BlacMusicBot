@@ -95,5 +95,3 @@ async def stop() -> None:
     logger.info("✅ Bot stopped successfully.\n")
 
 # Imported last to avoid circular import with _autoplay
-from BlacMusic.core.calls import TgCall
-tune = TgCall()
