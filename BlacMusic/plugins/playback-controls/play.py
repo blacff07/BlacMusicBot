@@ -1,262 +1,431 @@
 # ==============================================================================
-# _play.py - Play Command Helper & Validator
+# play.py - Main Play Command Handler
 # ==============================================================================
-# This file contains the @checkUB decorator used by play commands.
-# Validates:
-# - User permissions (only real users, not anonymous admins)
-# - Chat type (only supergroups)
-# - Command syntax (query or reply required)
-# - Queue limits
-# - YouTube URL validity
-#
-# This decorator ensures all play commands have proper validation before execution.
+# This is the core plugin that handles all play-related commands:
+# - /play <query> - Play audio from YouTube search or URL
+# - /vplay <query> - Play video in the voice chat (when enabled)
+# - /playforce - Force play (skip queue and play immediately)
+# - /vplayforce - Force video playback (skip queue)
+# - /cplay - Play in connected channel
+# - /cvplay - Play video in connected channel (when enabled)
+# 
+# Supports:
+# - YouTube search queries
+# - YouTube URLs (videos and playlists)
+# - Telegram audio files (via reply)
+# - Queue management
+# - Channel play mode
 # ==============================================================================
 
+from pyrogram import filters
+from pyrogram import types
+from pyrogram.errors import FloodWait, MessageIdInvalid, MessageDeleteForbidden, ChatSendPlainForbidden, ChatWriteForbidden
+
+from BlacMusic import tune, app, config, db, lang, queue, tg, yt
+from BlacMusic.helpers import buttons, utils
+from BlacMusic.helpers._play import checkUB
 import asyncio
+import logging
 
-from pyrogram import enums, errors, types
-
-from BlacMusic import app, config, db, queue, yt
+logger = logging.getLogger(__name__)
 
 
-def checkUB(play):
-    async def wrapper(_, m: types.Message):
-        async def safe_reply(text):
-            """Safely send reply, return None if chat doesn't allow messages"""
-            try:
-                return await m.reply_text(text)
-            except (errors.ChatWriteForbidden, errors.ChatSendPlainForbidden):
-                # Chat doesn't allow text messages - silently return
-                return None
-            except Exception:
-                return None
+async def safe_edit(message, text, **kwargs):
+    """
+    Safely edit a message with proper error handling for common Telegram API errors.
+    
+    Args:
+        message: The message object to edit
+        text: New text content
+        **kwargs: Additional arguments for edit_text
         
-        if not m.from_user:
-            await safe_reply(m.lang["play_user_invalid"])
-            return
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        await message.edit_text(text, **kwargs)
+        return True
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        try:
+            await message.edit_text(text, **kwargs)
+            return True
+        except (MessageIdInvalid, MessageDeleteForbidden, Exception):
+            return False
+    except (MessageIdInvalid, MessageDeleteForbidden):
+        # Message was deleted or became invalid - this is expected
+        return False
+    except Exception:
+        # Other errors - log but don't crash
+        return False
 
-        if m.chat.type != enums.ChatType.SUPERGROUP:
-            await safe_reply(m.lang["play_chat_invalid"])
-            return await app.leave_chat(m.chat.id)
 
-        if not m.reply_to_message and (
-            len(m.command) < 2 or (len(m.command)
-                                   == 2 and m.command[1] == "-f")
-        ):
-            await safe_reply(m.lang["play_usage"])
-            return
+async def safe_reply(message, text, **kwargs):
+    """
+    Safely send a reply message with proper error handling for media-only chats.
+    
+    Args:
+        message: The message object to reply to
+        text: Text content to send
+        **kwargs: Additional arguments for reply_text
+        
+    Returns:
+        The sent message object if successful, None otherwise
+    """
+    try:
+        return await message.reply_text(text, **kwargs)
+    except (ChatSendPlainForbidden, ChatWriteForbidden):
+        logger.warning(f"Cannot send text in chat {message.chat.id} (chat write forbidden)")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to send reply: {e}")
+        return None
 
-        if len(queue.get_queue(m.chat.id)) >= config.QUEUE_LIMIT:
-            await safe_reply(m.lang["play_queue_full"].format(config.QUEUE_LIMIT))
-            return
 
-        command = m.command[0].lower()
-        force = command.endswith("force") or (
-            len(m.command) > 1 and "-f" in m.command[1]
+def playlist_to_queue(chat_id: int, tracks: list) -> str:
+    """
+    Add multiple tracks to queue and format them as a message.
+    
+    Args:
+        chat_id: The chat ID where queue is managed
+        tracks: List of Track objects to add
+        
+    Returns:
+        Formatted string listing all added tracks
+    """
+    text = "<blockquote expandable>"
+    for track in tracks:
+        pos = queue.add(chat_id, track)  # Add track to queue (returns 0-based index)
+        text += f"<b>{pos}.</b> {track.title}\n"  # Show actual queue position
+    text = text[:1948] + "</blockquote>"  # Limit message length
+    return text
+
+@app.on_message(
+    filters.command(
+        [
+            "play",
+            "playforce",
+            "cplay",
+            "cplayforce",
+            "vplay",
+            "vplayforce",
+            "cvplay",
+            "cvplayforce",
+        ]
+    )
+    & ~app.bl_users
+)
+@lang.language()
+@checkUB
+async def play_hndlr(
+    _,
+    m: types.Message,
+    force: bool = False,
+    url: str = None,
+    cplay: bool = False,
+    video: bool = False,
+) -> None:
+    # Auto-delete command message
+    try:
+        await m.delete()
+    except Exception:
+        pass
+
+    # DM guard — play commands only work in groups
+    from pyrogram import enums
+    if m.chat.type == enums.ChatType.PRIVATE:
+        return await m.reply_text(
+            "<blockquote>🎵 <b>ᴘʟᴀʏ ᴄᴏᴍᴍᴀɴᴅꜱ ᴡᴏʀᴋ ɪɴ ɢʀᴏᴜᴘꜱ ᴏɴʟʏ</b>\n\n"
+            "ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ɢʀᴏᴜᴘ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴀ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ᴛᴏ ᴘʟᴀʏ ᴍᴜꜱɪᴄ.\n\n"
+            "ᴜꜱᴇ /help ᴛᴏ ꜱᴇᴇ ᴀʟʟ ᴀᴠᴀɪʟᴀʙʟᴇ ᴄᴏᴍᴍᴀɴᴅꜱ.</blockquote>"
         )
-        cplay = command.startswith("c")
 
-        video_requested = command.startswith("v") or command.startswith("cv")
-        if video_requested and not await db.get_vplay_enabled():
-            await safe_reply(m.lang["play_video_disabled"])
-            return
-        video = video_requested
+    # Handle channel play mode
+    chat_id = m.chat.id
+    message_chat_id = m.chat.id  # Store original group chat ID for thumbnail
+    if cplay:
+        channel_id = await db.get_cmode(m.chat.id)
+        if channel_id is None:
+            return await safe_reply(m,
+                "<blockquote>❌ Channel play is not enabled.\n\n"
+                "To enable for linked channel:\n"
+                "`/channelplay linked`\n\n"
+                "To enable for any channel:\n"
+                "`/channelplay [channel_id]`</blockquote>"
+            )
+        try:
+            chat = await app.get_chat(channel_id)
+            chat_id = channel_id
+        except:
+            await db.set_cmode(m.chat.id, None)
+            return await safe_reply(m,
+                "<blockquote>❌ ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇᴛ ᴄʜᴀɴɴᴇʟ.\n\n"
+                "ᴍᴀᴋᴇ ꜱᴜʀᴇ ɪ'ᴍ ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ᴀɴᴅ ᴄʜᴀɴɴᴇʟ ᴘʟᴀʏ ɪꜱ ꜱᴇᴛ ᴄᴏʀʀᴇᴄᴛʟʏ.</blockquote>"
+            )
         
-        url = yt.url(m)
-        # Only validate URL if not replying to media (Telegram files have t.me URLs)
-        if url and not m.reply_to_message and not yt.valid(url):
-            return await m.reply_text(m.lang["play_unsupported"])
-
-        play_mode = await db.get_play_mode(m.chat.id)
-        if play_mode or force:
-            adminlist = await db.get_admins(m.chat.id)
-            if (
-                m.from_user.id not in adminlist
-                and not await db.is_auth(m.chat.id, m.from_user.id)
-                and not m.from_user.id in app.sudoers
-            ):
-                await safe_reply(m.lang["play_admin"])
-                return
-
-        if m.chat.id not in db.active_calls:
-            client = await db.get_client(m.chat.id)
+        # Auto-join assistant to channel if not already a member
+        client = await db.get_client(channel_id)
+        try:
+            # Check if assistant is in the channel
+            await app.get_chat_member(channel_id, client.id)
+        except Exception:
+            # Assistant not in channel, try to join
             try:
-                member = await app.get_chat_member(m.chat.id, client.id)
-                if member.status in [
-                    enums.ChatMemberStatus.BANNED,
-                    enums.ChatMemberStatus.RESTRICTED,
-                ]:
+                # For channels, we need an invite link
+                if chat.username:
+                    invite_link = chat.username
+                else:
+                    # Try to get/create invite link
                     try:
-                        await app.unban_chat_member(
-                            chat_id=m.chat.id, user_id=client.id
+                        invite_link = chat.invite_link
+                        if not invite_link:
+                            invite_link = await app.export_chat_invite_link(channel_id)
+                    except Exception:
+                        return await safe_reply(m,
+                            f"<blockquote>❌ ᴀꜱꜱɪꜱᴛᴀɴᴛ ɴᴏᴛ ɪɴ ᴄʜᴀɴɴᴇʟ!\n\n"
+                            f"ᴘʟᴇᴀꜱᴇ ᴀᴅᴅ @{client.username if client.username else client.mention} "
+                            f"ᴛᴏ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ᴀꜱ ᴀᴅᴍɪɴ ᴡɪᴛʜ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ.</blockquote>"
                         )
-                    except:
-                        await safe_reply(
-                            m.lang["play_banned"].format(
-                                app.name,
-                                client.id,
-                                client.mention,
-                                f"@{client.username}" if client.username else None,
-                            )
-                        )
-                        return
-            except errors.PeerIdInvalid:
-                # Assistant hasn't seen this peer yet — join then re-check immediately
-                joined = False
+                
+                # Show joining message
+                join_msg = await safe_reply(m,
+                    f"<blockquote>🔄 ᴊᴏɪɴɪɴɢ ᴀꜱꜱɪꜱᴛᴀɴᴛ ᴛᴏ ᴄʜᴀɴɴᴇʟ...</blockquote>"
+                )
+                
+                # Try to join the channel
+                await client.join_chat(invite_link)
+                await asyncio.sleep(1)  # Give it time to fully join
+                
+                # Delete joining message
                 try:
-                    invite_link = (await app.get_chat(m.chat.id)).invite_link
-                    if not invite_link:
-                        invite_link = await app.export_chat_invite_link(m.chat.id)
-                    await client.join_chat(invite_link)
-                    joined = True
-                except Exception:
+                    await join_msg.delete()
+                except:
                     pass
-                if not joined:
-                    await safe_reply(
-                        "<blockquote>❌ ᴀꜱꜱɪꜱᴛᴀɴᴛ ᴄᴏᴜʟᴅɴ'ᴛ ᴊᴏɪɴ ᴛʜɪꜱ ᴄʜᴀᴛ.\n"
-                        "ᴘʟᴇᴀꜱᴇ ᴍᴀᴋᴇ ᴛʜᴇ ɢʀᴏᴜᴘ ᴘᴜʙʟɪᴄ ᴏʀ ᴀᴅᴅ ᴛʜᴇ ᴀꜱꜱɪꜱᴛᴀɴᴛ ᴍᴀɴᴜᴀʟʟʏ.</blockquote>"
-                    )
-                    return
-                # Re-check member status after joining — then fall through to play
-                try:
-                    member = await app.get_chat_member(m.chat.id, client.id)
-                    if member.status in [
-                        enums.ChatMemberStatus.BANNED,
-                        enums.ChatMemberStatus.RESTRICTED,
-                    ]:
-                        await safe_reply(
-                            m.lang["play_banned"].format(
-                                app.name, client.id, client.mention,
-                                f"@{client.username}" if client.username else None,
-                            )
-                        )
-                        return
-                except Exception:
-                    pass  # Joined successfully, proceed to play
-            except errors.ChatAdminRequired:
-                await safe_reply(
-                    f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
-                    f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
-                    f"<b>Required permissions:</b>\n"
-                    f" Manage Voice Chats\n"
-                    f" Invite Users via Link\n"
-                    f" Delete Messages\n\n"
-                    f"Please promote me as admin with the required permissions.</blockquote>"
+                    
+            except Exception as e:
+                error_str = str(e)
+                return await safe_reply(m,
+                    f"<blockquote>❌ ꜰᴀɪʟᴇᴅ ᴛᴏ ᴊᴏɪɴ ᴀꜱꜱɪꜱᴛᴀɴᴛ ᴛᴏ ᴄʜᴀɴɴᴇʟ!\n\n"
+                    f"ᴘʟᴇᴀꜱᴇ ᴍᴀɴᴜᴀʟʟʏ ᴀᴅᴅ @{client.username if client.username else client.mention} "
+                    f"ᴛᴏ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ᴀꜱ ᴀᴅᴍɪɴ ᴡɪᴛʜ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ.\n\n"
+                    f"Error: {error_str}</blockquote>"
+                )
+
+    # Select emoji for this play session
+    play_emoji = m.lang["play_emoji"]
+    
+    try:
+        sent = await safe_reply(m, m.lang["play_searching"].format(play_emoji))
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        try:
+            sent = await safe_reply(m, m.lang["play_searching"].format(play_emoji))
+        except FloodWait as e2:
+            # If still flood wait, wait longer and give up gracefully
+            await asyncio.sleep(e2.value)
+            return  # Abort silently
+        except Exception:
+            return  # Abort silently
+    except Exception:
+        return  # If we can't even send initial message, abort
+    
+    mention = m.from_user.mention
+    media = tg.get_media(m.reply_to_message) if m.reply_to_message else None
+    tracks = []
+    file = None  # Initialize file variable
+
+    # Check media first (Telegram files) before URL extraction
+    if media:
+        setattr(sent, "lang", m.lang)
+        file = await tg.download(m.reply_to_message, sent)
+
+    elif url:
+        if "playlist" in url:
+            await safe_edit(sent, m.lang["playlist_fetch"])
+            try:
+                tracks = await yt.playlist(
+                    config.PLAYLIST_LIMIT, mention, url
+                )
+            except Exception as e:
+                await safe_edit(
+                    sent,
+                    f"<blockquote>❌ ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ ᴘʟᴀʏʟɪꜱᴛ.\n\n"
+                    f"ʏᴏᴜᴛᴜʙᴇ ᴘʟᴀʏʟɪꜱᴛꜱ ᴀʀᴇ ᴄᴜʀʀᴇɴᴛʟʏ ᴇxᴘᴇʀɪᴇɴᴄɪɴɢ ɪꜱꜱᴜᴇꜱ. "
+                    f"ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴘʟᴀʏɪɴɢ ɪɴᴅɪᴠɪᴅᴜᴀʟ ꜱᴏɴɢꜱ ɪɴꜱᴛᴇᴀᴅ.</blockquote>"
                 )
                 return
-            except errors.UserNotParticipant:
-                if m.chat.username:
-                    invite_link = m.chat.username
-                    try:
-                        await client.resolve_peer(invite_link)
-                    except:
-                        pass
-                else:
-                    try:
-                        invite_link = (await app.get_chat(m.chat.id)).invite_link
-                        if not invite_link:
-                            invite_link = await app.export_chat_invite_link(m.chat.id)
-                    except errors.ChatAdminRequired:
-                        await safe_reply(
-                            f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
-                            f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
-                            f"<b>Required permissions:</b>\n"
-                            f" Manage Voice Chats\n"
-                            f" Invite Users via Link\n"
-                            f" Delete Messages\n\n"
-                            f"Please promote me as admin with the required permissions.</blockquote>"
-                        )
-                        return
-                    except errors.ChatAdminRequired:
-                        await safe_reply(
-                            f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
-                            f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
-                            f"<b>Required permissions:</b>\n"
-                            f" Manage Voice Chats\n"
-                            f" Invite Users via Link\n"
-                            f" Delete Messages\n\n"
-                            f"Please promote me as admin with the required permissions.</blockquote>"
-                        )
-                        return
-                    except Exception as ex:
-                        await safe_reply(
-                            m.lang["play_invite_error"].format(
-                                type(ex).__name__)
-                        )
-                        return
 
-                umm = await safe_reply(m.lang["play_invite"].format(app.name))
-                if umm:
-                    await asyncio.sleep(2)
+            if not tracks:
+                await safe_edit(sent, m.lang["playlist_error"])
+                return
+
+            file = tracks[0]
+            tracks.remove(file)
+            file.message_id = sent.id
+        else:
+            file = await yt.search(url, sent.id)
+
+        if not file:
+            await safe_edit(
+                sent,
+                m.lang["play_not_found"].format(config.SUPPORT_CHAT)
+            )
+            return
+
+    elif len(m.command) >= 2:
+        query = " ".join(m.command[1:])
+        file = await yt.search(query, sent.id)
+        if not file:
+            await safe_edit(
+                sent,
+                m.lang["play_not_found"].format(config.SUPPORT_CHAT)
+            )
+            return
+        # Store query for autoplay mood seeding
+        await db.set_last_query(chat_id, query)
+
+    if not file:
+        return
+
+    file.video = getattr(file, "video", False) or video
+    if file.video:
+        for track in tracks:
+            track.video = True
+
+    # Skip duration check for live streams
+    if not file.is_live and file.duration_sec > config.DURATION_LIMIT:
+        await safe_edit(
+            sent,
+            m.lang["play_duration_limit"].format(config.DURATION_LIMIT // 60)
+        )
+        return
+
+    if await db.is_logger():
+        await utils.play_log(m, file.title, file.duration)
+
+    file.user = mention
+    if force:
+        queue.force_add(chat_id, file)
+    else:
+        position = queue.add(chat_id, file)  # Returns 0-based index
+
+        if await db.get_call(chat_id):
+            # When call is active, position 0 is currently playing
+            # So actual waiting position is: position (e.g., 1st waiting = index 1)
+            # Display as 1-based for users: index 1 → "1st in queue"
+            await safe_edit(
+                sent,
+                m.lang["play_queued"].format(
+                    position,  # Shows waiting position: 1, 2, 3...
+                    file.url,
+                    file.title,
+                    file.duration,
+                    m.from_user.mention,
+                ),
+                reply_markup=buttons.play_queued(
+                    chat_id, file.id, m.lang["play_now"]
+                ),
+            )
+            if tracks:
+                added = playlist_to_queue(chat_id, tracks)
                 try:
-                    await client.join_chat(invite_link)
-                except errors.UserAlreadyParticipant:
+                    await app.send_message(
+                        chat_id=m.chat.id,
+                        text=m.lang["playlist_queued"].format(len(tracks)) + added,
+                    )
+                except Exception:
+                    # Can't send message, continue anyway
                     pass
-                except errors.InviteRequestSent:
-                    try:
-                        await client.approve_chat_join_request(m.chat.id, client.id)
-                    except errors.ChatAdminRequired:
-                        if umm:
-                            try:
-                                await umm.edit_text(
-                                    f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
-                                    f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
-                                    f"<b>Required permissions:</b>\n"
-                                    f" Manage Voice Chats\n"
-                                    f" Invite Users via Link\n"
-                                    f" Delete Messages\n\n"
-                                    f"Please promote me as admin with the required permissions.</blockquote>"
-                                )
-                            except:
-                                pass
-                        return
-                    except Exception as ex:
-                        if umm:
-                            try:
-                                await umm.edit_text(
-                                    m.lang["play_invite_error"].format(
-                                        type(ex).__name__)
-                                )
-                            except:
-                                pass
-                        return
-                except errors.ChatAdminRequired:
-                    if umm:
-                        try:
-                            await umm.edit_text(
-                                f"<blockquote><b> Bot Admin Required</b></blockquote>\n\n"
-                                f"<blockquote>To play music in this chat, I need to be an <b>administrator</b>.\n\n"
-                                f"<b>Required permissions:</b>\n"
-                                f" Manage Voice Chats\n"
-                                f" Invite Users via Link\n"
-                                f" Delete Messages\n\n"
-                                f"Please promote me as admin with the required permissions.</blockquote>"
-                            )
-                        except:
-                            pass
-                    return
-                except Exception as ex:
-                    if umm:
-                        try:
-                            await umm.edit_text(
-                                m.lang["play_invite_error"].format(type(ex).__name__)
-                            )
-                        except:
-                            pass
-                    return
+            
+            # ✨ NEW: Start preloading queued tracks in background
+            try:
+                from BlacMusic import preload
+                asyncio.create_task(preload.start_preload(chat_id, count=2))
+            except Exception:
+                # Non-critical, continue without preload
+                pass
+            
+            return
 
-                if umm:
-                    try:
-                        await umm.delete()
-                    except:
-                        pass
-                await client.resolve_peer(m.chat.id)
+    if not file.file_path:
+        file.file_path = await yt.download(
+            file.id,
+            is_live=file.is_live,
+            video=getattr(file, "video", False),
+        )
+        if not file.file_path:
+            await safe_edit(
+                sent,
+                "<blockquote>❌ Failed to download media.\n\n"
+                "Possible reasons:\n"
+                "• YouTube detected bot activity (update cookies)\n"
+                "• Video is region-blocked or private\n"
+                "• Age-restricted content (requires cookies)</blockquote>"
+            )
 
+    try:
+        # Pass message_chat_id only if it's different from chat_id (channel play mode)
+        await tune.play_media(
+            chat_id=chat_id, 
+            message=sent, 
+            media=file, 
+            message_chat_id=message_chat_id if chat_id != message_chat_id else None
+        )
+        # React with emoji on successful play
         try:
-            await m.delete()
-        except:
+            emoji = m.lang["play_emoji"]
+            await m.react(emoji)
+        except Exception:
+            # If reaction fails, continue anyway (not critical)
             pass
-
-        return await play(_, m, force, url, cplay, video)
-
-    return wrapper
+    except Exception as e:
+        error_msg = str(e)
+        if "bot" in error_msg.lower() or "sign in" in error_msg.lower():
+            await safe_edit(
+                sent,
+                "<blockquote>❌ YouTube bot detection triggered.\n\n"
+                "Solution:\n"
+                "• Update YouTube cookies in `BlacMusic/cookies/` folder\n"
+                "• Wait a few minutes before trying again\n"
+                "• Try /radio for uninterrupted music\n\n"
+                f"Support: {config.SUPPORT_CHAT}</blockquote>"
+            )
+        else:
+            await safe_edit(
+                sent,
+                f"<blockquote>❌ Playback error:\n{error_msg}\n\n"
+                f"Support: {config.SUPPORT_CHAT}</blockquote>"
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+            )
+        return
+    if not tracks:
+        return
+    added = playlist_to_queue(chat_id, tracks)
+    try:
+        await app.send_message(
+            chat_id=m.chat.id,
+            text=m.lang["playlist_queued"].format(len(tracks)) + added,
+        )
+    except Exception:
+        # Can't send message, but playback is working
+        pass
