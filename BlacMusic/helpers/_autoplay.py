@@ -1,26 +1,15 @@
 # ==============================================================================
 # _autoplay.py - Autoplay Engine
 # ==============================================================================
-# Handles:
-# 1. Fetching 3 related/mood-based YouTube suggestions from last query
-# 2. Sending suggestion buttons when queue is empty
-# 3. Silently queueing one autoplay track when autoplay is ON
-# 4. Callback handler for suggestion button taps
-# ==============================================================================
 
 import asyncio
 import random
-from dataclasses import replace
 
 from youtubesearchpython import VideosSearch
 
-from BlacMusic import app, db, lang, logger, queue, tune, yt
-from BlacMusic.helpers._dataclass import Track
-from BlacMusic.helpers._utilities import Utilities
+# NOTE: All BlacMusic imports are intentionally lazy (inside functions)
+# to avoid circular import since calls.py imports this at module level.
 
-utils = Utilities()
-
-# Mood/genre modifier bank — appended to the last query to find related songs
 _MOOD_MODIFIERS = [
     "similar songs",
     "songs like this",
@@ -30,16 +19,21 @@ _MOOD_MODIFIERS = [
 ]
 
 
-async def _search_multi(base_query: str, count: int = 3) -> list[Track]:
-    """
-    Search YouTube for `count` distinct tracks related to `base_query`.
-    Uses different mood modifiers per slot so results vary.
-    """
-    tracks: list[Track] = []
+def _get_utils():
+    from BlacMusic.helpers._utilities import Utilities
+    return Utilities()
+
+
+async def _search_multi(base_query: str, count: int = 3):
+    from BlacMusic import logger
+    from BlacMusic.helpers._dataclass import Track
+    from BlacMusic.helpers._utilities import Utilities
+
+    utils = Utilities()
+    tracks = []
     seen_ids: set[str] = set()
 
     modifiers = random.sample(_MOOD_MODIFIERS, min(count, len(_MOOD_MODIFIERS)))
-    # Pad if needed
     while len(modifiers) < count:
         modifiers.append(random.choice(_MOOD_MODIFIERS))
 
@@ -48,31 +42,31 @@ async def _search_multi(base_query: str, count: int = 3) -> list[Track]:
         try:
             def _do_search(q=query):
                 s = VideosSearch(q, limit=3)
-                return s.next()  # sync call
+                return s.next()
 
             data = await asyncio.get_event_loop().run_in_executor(None, _do_search)
             data_list = data.get("result", [])
-            for data in data_list:
-                vid_id = data.get("id")
+            for item in data_list:
+                vid_id = item.get("id")
                 if not vid_id or vid_id in seen_ids:
                     continue
                 seen_ids.add(vid_id)
-                duration = data.get("duration")
+                duration = item.get("duration")
                 is_live = duration is None or duration == "LIVE"
                 track = Track(
                     id=vid_id,
-                    channel_name=data.get("channel", {}).get("name", ""),
+                    channel_name=item.get("channel", {}).get("name", ""),
                     duration=duration if not is_live else "LIVE",
                     duration_sec=0 if is_live else utils.to_seconds(duration),
                     message_id=0,
-                    title=data.get("title", "Unknown")[:40],
-                    thumbnail=data.get("thumbnails", [{}])[-1].get("url", "").split("?")[0],
-                    url=data.get("link", ""),
-                    view_count=data.get("viewCount", {}).get("short"),
+                    title=item.get("title", "Unknown")[:40],
+                    thumbnail=item.get("thumbnails", [{}])[-1].get("url", "").split("?")[0],
+                    url=item.get("link", ""),
+                    view_count=item.get("viewCount", {}).get("short"),
                     is_live=is_live,
                 )
                 tracks.append(track)
-                break  # one per modifier slot
+                break
         except Exception as e:
             logger.debug(f"Autoplay search error for '{query}': {e}")
 
@@ -80,10 +74,9 @@ async def _search_multi(base_query: str, count: int = 3) -> list[Track]:
 
 
 async def send_suggestions(chat_id: int, target_chat: int) -> None:
-    """
-    Send 3 inline suggestion buttons to the group when the queue is empty.
-    Each button shows a song title; tapping it queues and plays that song.
-    """
+    from pyrogram import types as ptypes
+    from BlacMusic import app, db, lang, logger
+
     last_query = await db.get_last_query(chat_id)
     if not last_query:
         return
@@ -97,22 +90,15 @@ async def send_suggestions(chat_id: int, target_chat: int) -> None:
     if not suggestions:
         return
 
-    from pyrogram import types as ptypes
-
-    # Build one button per suggestion — callback carries the YouTube video ID + title
     buttons = []
     for track in suggestions:
-        # Trim title for button label
         label = track.title[:30] + ("…" if len(track.title) > 30 else "")
-        # Store vid_id in callback_data; full title stored via vid ID lookup
         buttons.append([ptypes.InlineKeyboardButton(
             text=f"🎵 {label}",
             callback_data=f"autoplay_pick {chat_id} {track.id}",
         )])
 
     markup = ptypes.InlineKeyboardMarkup(buttons)
-
-    _lang = await lang.get_lang(chat_id)
     text = (
         "<blockquote>🎶 <b>ǫᴜᴇᴜᴇ ᴇᴍᴘᴛɪᴇᴅ</b>\n\n"
         "ᴛᴀᴘ ᴀ ꜱᴏɴɢ ᴛᴏ ᴋᴇᴇᴘ ᴛʜᴇ ᴠɪʙᴇ ɢᴏɪɴɢ ↓</blockquote>"
@@ -124,19 +110,14 @@ async def send_suggestions(chat_id: int, target_chat: int) -> None:
 
 
 async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
-    """
-    Silently queue and play one autoplay track.
-    Called when autoplay is ON and queue just emptied.
-    Also fires send_suggestions so users can see what's coming or pick alternatives.
-    """
+    from BlacMusic import app, db, lang, logger, queue, yt
+
     last_query = await db.get_last_query(chat_id)
     if not last_query:
         return
 
-    # Show suggestion buttons in parallel (non-blocking)
     asyncio.create_task(send_suggestions(chat_id, target_chat))
 
-    # Pick ONE related track to auto-queue
     try:
         suggestions = await _search_multi(last_query, count=1)
         if not suggestions:
@@ -146,7 +127,6 @@ async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
         logger.debug(f"Autoplay trigger error for {chat_id}: {e}")
         return
 
-    # Download it
     try:
         track.file_path = await yt.download(track.id, is_live=track.is_live, video=False)
         if not track.file_path:
@@ -155,8 +135,6 @@ async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
         logger.debug(f"Autoplay: download failed for {track.id}: {e}")
         return
 
-    # Send a "now autoplaying" message
-    _lang = await lang.get_lang(chat_id)
     try:
         msg = await app.send_message(
             chat_id=target_chat,
@@ -171,7 +149,6 @@ async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
         track.message_id = 0
         msg = None
 
-    # Add to queue at position 0 (plays immediately) and start
     queue.force_add(chat_id, track)
     try:
         await tune.play_media(chat_id, msg, track)
