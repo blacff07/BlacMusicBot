@@ -20,7 +20,7 @@ from BlacMusic.helpers._admins import is_admin
 
 
 @app.on_message(
-    filters.command(["autoplay"]) & filters.group & ~app.bl_users
+    filters.command(["autoplay"]) & ~app.bl_users
 )
 @lang.language()
 async def autoplay_cmd(_, m: types.Message):
@@ -28,6 +28,14 @@ async def autoplay_cmd(_, m: types.Message):
         await m.delete()
     except Exception:
         pass
+
+    from pyrogram import enums as _enums
+    if m.chat.type == _enums.ChatType.PRIVATE:
+        return await m.reply_text(
+            "<blockquote>⚠️ <b>ɢʀᴏᴜᴘ ᴏɴʟʏ</b>\n\n"
+            "ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴡᴏʀᴋꜱ ᴏɴʟʏ ɪɴ ɢʀᴏᴜᴘ ᴠᴏɪᴄᴇ ᴄʜᴀᴛꜱ.\n"
+            "ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ɢʀᴏᴜᴘ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴀ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ꜰɪʀꜱᴛ.</blockquote>"
+        )
 
     if not m.from_user:
         return
