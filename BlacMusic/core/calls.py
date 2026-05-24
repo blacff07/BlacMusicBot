@@ -135,13 +135,16 @@ class TgCall(PyTgCalls):
             logger.warning(f"Error clearing queue/call for {chat_id}: {e}")
 
         # Try all active pytgcalls clients — ensures leave even for TG voice files
+        left = False
         for _client in self.clients:
             try:
                 await _client.leave_call(chat_id)
-                await asyncio.sleep(0.3)
-                break  # One successful leave is enough
+                left = True
+                break
             except Exception:
                 pass
+        if not left:
+            logger.debug(f"Could not leave call for {chat_id} — already ended or not joined")
 
     async def play_media(
         self,
@@ -569,6 +572,18 @@ class TgCall(PyTgCalls):
                             await db.rm_chat(chat_id)
                         return
 
+                # Clear file_path of current track before getting next
+                # Stale paths cause silent playback on second song
+                _current = queue.get_current(chat_id)
+                if _current and _current.file_path and not getattr(_current, 'is_live', False):
+                    try:
+                        import os as _os
+                        if _os.path.exists(_current.file_path):
+                            _os.remove(_current.file_path)
+                    except Exception:
+                        pass
+                    _current.file_path = None
+
                 media = queue.get_next(chat_id)
 
                 if not media and loop_mode == 10:
@@ -595,17 +610,18 @@ class TgCall(PyTgCalls):
                             await db.rm_chat(chat_id)
                         return
 
-                try:
-                    if media and media.message_id:
-                        await app.delete_messages(
-                            chat_id=chat_id,
-                            message_ids=media.message_id,
-                            revoke=True,
-                        )
-                        media.message_id = 0
-                except Exception as e:
-                    logger.debug(
-                        f"Could not delete previous message in {chat_id}: {e}")
+                if config.CLEANUP_MSG:
+                    try:
+                        if media and media.message_id:
+                            await app.delete_messages(
+                                chat_id=target_chat,
+                                message_ids=media.message_id,
+                                revoke=True,
+                            )
+                            media.message_id = 0
+                    except Exception as e:
+                        logger.debug(
+                            f"Could not delete previous message in {chat_id}: {e}")
 
                 if not media:
                     # ── Queue empty — Autoplay / Suggestion hook ───────────
@@ -620,11 +636,14 @@ class TgCall(PyTgCalls):
                             trigger_autoplay(chat_id, target_chat)
                         )
                         return  # autoplay takes over, don't stop
-                    elif not queue_has_items:
+                    else:
                         # Autoplay OFF and queue truly empty: send suggestion strip
-                        asyncio.create_task(
-                            send_suggestions(chat_id, target_chat)
-                        )
+                        # Only send if no items were added while we were processing
+                        _fresh_check = bool(queue.get_all(chat_id))
+                        if not _fresh_check:
+                            asyncio.create_task(
+                                send_suggestions(chat_id, target_chat)
+                            )
 
                     if config.AUTO_END:
                         _lang = await lang.get_lang(chat_id)
