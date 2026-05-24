@@ -179,11 +179,44 @@ class TgCall(PyTgCalls):
             _thumb = config.DEFAULT_THUMB
 
         if not media.file_path:
-            if message:
-                return await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
+            _is_live = getattr(media, 'is_live', False)
+            _media_id = getattr(media, 'id', '')
+            # For live/radio tracks, file_path IS the stream URL — don't re-download by timestamp ID
+            _looks_like_yt_id = _media_id and len(_media_id) == 11 and not _media_id.isdigit()
+            if _is_live and not _looks_like_yt_id:
+                # Direct stream URL track — file_path was the URL, restore from track.url
+                media.file_path = getattr(media, 'url', None)
             else:
-                logger.error(f"No file path for media in {chat_id}")
+                # Normal YouTube track — re-download
+                logger.debug(f"Re-downloading {_media_id} for {chat_id}")
+                try:
+                    media.file_path = await yt.download(
+                        _media_id,
+                        is_live=_is_live,
+                        video=getattr(media, 'video', False),
+                    )
+                except Exception as dl_err:
+                    logger.warning(f"Re-download failed for {chat_id}: {dl_err}")
+            if not media.file_path:
+                if message:
+                    try:
+                        await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
+                    except Exception:
+                        pass
                 return
+
+        # Stop previous video stream if switching to audio-only (prevents black video)
+        _prev = queue.get_current(chat_id)
+        _prev_was_video = _prev and getattr(_prev, 'video', False)
+        _this_is_audio = not getattr(media, 'video', False) and not getattr(media, 'is_live', False)
+        if _prev_was_video and _this_is_audio:
+            for _vc_client in self.clients:
+                try:
+                    await _vc_client.leave_call(chat_id)
+                    await asyncio.sleep(0.5)
+                    break
+                except Exception:
+                    pass
 
         # Validate chat_id - check if it's a valid channel/group
         try:
