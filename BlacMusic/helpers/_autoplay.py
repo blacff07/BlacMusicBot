@@ -16,7 +16,21 @@ _MOOD_MODIFIERS = [
     "related music",
     "same vibe playlist",
     "best mix",
+    "top hits",
+    "new releases",
+    "trending",
+    "acoustic version",
+    "official audio",
+    "remix",
+    "cover",
+    "live session",
+    "deep cut",
+    "b-side",
 ]
+
+# Per-chat history to prevent autoplay repeating songs
+_played_history: dict[int, set] = {}
+_MAX_HISTORY = 30  # Remember last 30 played IDs per chat
 
 
 def _get_utils():
@@ -24,7 +38,7 @@ def _get_utils():
     return Utilities()
 
 
-async def _search_multi(base_query: str, count: int = 3):
+async def _search_multi(base_query: str, count: int = 3, chat_id: int = 0):
     from BlacMusic import logger
     from BlacMusic.helpers._dataclass import Track
     from BlacMusic.helpers._utilities import Utilities
@@ -32,6 +46,7 @@ async def _search_multi(base_query: str, count: int = 3):
     utils = Utilities()
     tracks = []
     seen_ids: set[str] = set()
+    _history = _played_history.get(chat_id, set())
 
     modifiers = random.sample(_MOOD_MODIFIERS, min(count, len(_MOOD_MODIFIERS)))
     while len(modifiers) < count:
@@ -48,7 +63,7 @@ async def _search_multi(base_query: str, count: int = 3):
             data_list = data.get("result", [])
             for item in data_list:
                 vid_id = item.get("id")
-                if not vid_id or vid_id in seen_ids:
+                if not vid_id or vid_id in seen_ids or vid_id in _history:
                     continue
                 seen_ids.add(vid_id)
                 duration = item.get("duration")
@@ -82,7 +97,7 @@ async def send_suggestions(chat_id: int, target_chat: int, last_msg_id: int = 0)
         return
 
     try:
-        suggestions = await _search_multi(last_query, count=3)
+        suggestions = await _search_multi(last_query, count=3, chat_id=chat_id)
     except Exception as e:
         logger.debug(f"Autoplay: failed to fetch suggestions for {chat_id}: {e}")
         return
@@ -123,13 +138,23 @@ async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
     if not last_query:
         return
 
-    asyncio.create_task(send_suggestions(chat_id, target_chat, last_msg_id=getattr(track, "message_id", 0) if "track" in dir() else 0))
+    asyncio.create_task(send_suggestions(chat_id, target_chat))
+
+    # Vary query with random modifier to get fresh results each time
+    _mod = random.choice(_MOOD_MODIFIERS)
+    _varied = f"{last_query} {_mod}"
 
     try:
-        suggestions = await _search_multi(last_query, count=1)
+        suggestions = await _search_multi(_varied, count=1, chat_id=chat_id)
         if not suggestions:
             return
         track = suggestions[0]
+        # Record in history to prevent repeat
+        if chat_id not in _played_history:
+            _played_history[chat_id] = set()
+        _played_history[chat_id].add(track.id)
+        if len(_played_history[chat_id]) > _MAX_HISTORY:
+            _played_history[chat_id] = set(list(_played_history[chat_id])[-15:])
     except Exception as e:
         logger.debug(f"Autoplay trigger error for {chat_id}: {e}")
         return
