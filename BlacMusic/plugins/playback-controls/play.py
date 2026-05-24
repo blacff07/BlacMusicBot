@@ -21,7 +21,7 @@ from pyrogram import filters
 from pyrogram import types
 from pyrogram.errors import FloodWait, MessageIdInvalid, MessageDeleteForbidden, ChatSendPlainForbidden, ChatWriteForbidden
 
-from BlacMusic import tune, app, config, db, lang, queue, tg, yt
+from BlacMusic import app, tune, app, config, db, lang, queue, tg, yt
 from BlacMusic.helpers import buttons, utils
 from BlacMusic.helpers._play import checkUB
 import asyncio
@@ -241,15 +241,23 @@ async def play_hndlr(
                     f"Error: {error_str}</blockquote>"
                 )
 
-    # Select emoji for this play session
-    play_emoji = m.lang["play_emoji"]
+    # Select emoji randomly at runtime from pool
+    import random as _rnd
+    _EMOJI_POOL = [
+        "🌷","🌹","👀","👁","👣","🫶","🫰","🎩","🦋","🕸",
+        "🐾","💫","💥","❄️","🍾","🥂","🧃","🍭","🎗","🎨",
+        "🎧","🚀","🎢","💡","💣","🧨","🔮","🧪","🌡","🎉",
+        "🎊","🪄","💌","🪩","🧮","❤️‍🩹","💝","💗","💞","💔",
+        "🖤","💢","💯","🎶","🎵","🔎","🦠","💥"
+    ]
+    play_emoji = _rnd.choice(_EMOJI_POOL)
     
     try:
-        sent = await safe_reply(m, m.lang["play_searching"].format(play_emoji))
+        sent = await safe_reply(m, m.lang["play_searching"])
     except FloodWait as e:
         await asyncio.sleep(e.value)
         try:
-            sent = await safe_reply(m, m.lang["play_searching"].format(play_emoji))
+            sent = await safe_reply(m, m.lang["play_searching"])
         except FloodWait as e2:
             # If still flood wait, wait longer and give up gracefully
             await asyncio.sleep(e2.value)
@@ -401,12 +409,16 @@ async def play_hndlr(
             media=file, 
             message_chat_id=message_chat_id if chat_id != message_chat_id else None
         )
-        # React with emoji on successful play
+        # React with random emoji on successful play
         try:
-            emoji = m.lang["play_emoji"]
-            await m.react(emoji)
+            _react_emoji = _rnd.choice(_EMOJI_POOL)
+            await app.send_reaction(
+                chat_id=m.chat.id,
+                message_id=m.id,
+                emoji=_react_emoji,
+                big=True,
+            )
         except Exception:
-            # If reaction fails, continue anyway (not critical)
             pass
     except Exception as e:
         error_msg = str(e)
