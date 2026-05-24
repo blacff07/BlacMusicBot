@@ -100,6 +100,23 @@ async def start(_, message: types.Message):
 
     # For private chats, add user to database if new
     if private:
+        # Send random animated reaction to their message
+        import random as _random
+        _reactions = [
+            "🌷","🌹","👀","👁","👣","🫶","🫰","🎩","🦋","🕸",
+            "🐾","💫","💥","❄️","🍾","🥂","🧃","🍭","🎗","🎨",
+            "🎧","🚀","🎢","💡","💣","🧨","⚰","🔮","🧪","🌡",
+            "🦠","🎉","🎊","🪄","💌","🪩","🧮","❤️‍🩹","💝","💗",
+            "💞","💔","🖤","💢","💯","🎶","🎵","🔎"
+        ]
+        try:
+            await message.react(
+                emoji=_random.choice(_reactions),
+                big=True,
+            )
+        except Exception:
+            pass
+
         if await db.is_user(message.from_user.id):
             return  # User already exists, no need to add
         # Log new user to logger group
