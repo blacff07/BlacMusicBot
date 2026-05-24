@@ -87,7 +87,7 @@ class Config:
         self.RADIO_IMG: str     = getenv("RADIO_IMG",     "https://files.catbox.moe/t03fzk.png")
 
         # ── LIMITS ────────────────────────────────────────────────────────────
-        self.DURATION_LIMIT: int  = int(getenv("DURATION_LIMIT",  "300")) * 60
+        self.DURATION_LIMIT: int  = int(getenv("DURATION_LIMIT",  "1500")) * 60
         self.QUEUE_LIMIT: int     = int(getenv("QUEUE_LIMIT",     "30"))
         self.PLAYLIST_LIMIT: int  = int(getenv("PLAYLIST_LIMIT",  "20"))
 
