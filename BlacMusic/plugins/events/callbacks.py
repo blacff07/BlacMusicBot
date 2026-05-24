@@ -126,15 +126,12 @@ async def _controls(_, query: types.CallbackQuery):
     if action == "shuffle":
         return await handle_shuffle(query, chat_id, user)
     
-    await query.answer(query.lang["processing"], show_alert=True)
-
     if action == "pause":
         if not await db.playing(chat_id):
-            return await query.answer(
-                query.lang["play_already_paused"], show_alert=True
-            )
+            return await query.answer("⏸ ᴀʟʀᴇᴀᴅʏ ᴘᴀᴜꜱᴇᴅ.", show_alert=True)
         if not await tune.pause(chat_id):
-            return await query.answer(query.lang["not_playing"], show_alert=True)
+            return await query.answer("❌ ɴᴏᴛ ᴘʟᴀʏɪɴɢ.", show_alert=True)
+        await query.answer("⏸ ꜱᴛʀᴇᴀᴍ ᴘᴀᴜꜱᴇᴅ.", show_alert=False)
         if qaction:
             return await query.edit_message_reply_markup(
                 reply_markup=buttons.queue_markup(
@@ -146,9 +143,10 @@ async def _controls(_, query: types.CallbackQuery):
     elif action == "resume":
         status = query.lang["playing"]
         if await db.playing(chat_id):
-            return await query.answer(query.lang["play_not_paused"], show_alert=True)
+            return await query.answer("▶ ᴀʟʀᴇᴀᴅʏ ᴘʟᴀʏɪɴɢ.", show_alert=True)
         if not await tune.resume(chat_id):
-            return await query.answer(query.lang["not_playing"], show_alert=True)
+            return await query.answer("❌ ɴᴏᴛ ᴘʟᴀʏɪɴɢ.", show_alert=True)
+        await query.answer("▶ ꜱᴛʀᴇᴀᴍ ʀᴇꜱᴜᴍᴇᴅ.", show_alert=False)
         if qaction:
             return await query.edit_message_reply_markup(
                 reply_markup=buttons.queue_markup(
@@ -157,6 +155,7 @@ async def _controls(_, query: types.CallbackQuery):
         reply = query.lang["play_resumed"].format(user)
 
     elif action == "skip":
+        await query.answer("⏭ ꜱᴋɪᴘᴘɪɴɢ...", show_alert=False)
         await tune.play_next(chat_id)
         status = query.lang["skipped"]
         reply = query.lang["play_skipped"].format(user)
@@ -188,6 +187,7 @@ async def _controls(_, query: types.CallbackQuery):
         return await tune.play_media(chat_id, msg, media)
 
     elif action == "replay":
+        await query.answer("🔁 ʀᴇᴘʟᴀʏɪɴɢ...", show_alert=False)
         media = queue.get_current(chat_id)
         media.user = user
         await tune.replay(chat_id)
@@ -195,6 +195,7 @@ async def _controls(_, query: types.CallbackQuery):
         reply = query.lang["play_replayed"].format(user)
 
     elif action == "stop":
+        await query.answer("⏹ ꜱᴛᴏᴘᴘɪɴɢ...", show_alert=False)
         await tune.stop(chat_id)
         status = query.lang["stopped"]
         reply = query.lang["play_stopped"].format(user)
@@ -249,6 +250,7 @@ async def _controls(_, query: types.CallbackQuery):
 
 
 async def handle_seek(query: types.CallbackQuery, chat_id: int, action: str, user: str):
+    await query.answer("⏩ ꜱᴇᴇᴋɪɴɢ...", show_alert=False)
     """Handle seek forward/backward actions."""
     media = queue.get_current(chat_id)
     if not media or media.is_live:
