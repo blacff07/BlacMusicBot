@@ -110,7 +110,9 @@ async def start(_, message: types.Message):
             "💞","💔","🖤","💢","💯","🎶","🎵","🔎"
         ]
         try:
-            await message.react(
+            await app.send_reaction(
+                chat_id=message.chat.id,
+                message_id=message.id,
                 emoji=_random.choice(_reactions),
                 big=True,
             )
