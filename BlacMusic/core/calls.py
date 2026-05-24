@@ -134,17 +134,35 @@ class TgCall(PyTgCalls):
         except Exception as e:
             logger.warning(f"Error clearing queue/call for {chat_id}: {e}")
 
-        # Try all active pytgcalls clients — ensures leave even for TG voice files
+        # Release play_next lock if stuck
+        if chat_id in self._play_next_locks:
+            _lock = self._play_next_locks[chat_id]
+            if _lock.locked():
+                try:
+                    _lock.release()
+                except Exception:
+                    pass
+
+        # Leave call via all PyTgCalls clients
         left = False
-        for _client in self.clients:
+        for _vc in self.clients:
             try:
-                await _client.leave_call(chat_id)
+                await _vc.leave_call(chat_id)
                 left = True
                 break
             except Exception:
                 pass
+
+        # Fallback: kick assistant from call via Pyrogram MTProto if PyTgCalls failed
+        if not left and client:
+            try:
+                await client.leave_call(chat_id)
+                left = True
+            except Exception:
+                pass
+
         if not left:
-            logger.debug(f"Could not leave call for {chat_id} — already ended or not joined")
+            logger.debug(f"Could not leave call for {chat_id} — already ended or not in call")
 
     async def play_media(
         self,
@@ -564,8 +582,18 @@ class TgCall(PyTgCalls):
         lock = self._play_next_locks[chat_id]
 
         if lock.locked():
-            logger.info(
-                f"play_next already running for {chat_id}, skipping duplicate call")
+            # Wait briefly for current play_next to finish (handles rapid skip)
+            try:
+                await asyncio.wait_for(asyncio.shield(lock.acquire()), timeout=8.0)
+                lock.release()
+            except asyncio.TimeoutError:
+                logger.warning(f"play_next lock timeout for {chat_id} — forcing reset")
+                # Force-release the lock to prevent permanent freeze
+                try:
+                    if lock.locked():
+                        lock.release()
+                except Exception:
+                    pass
             return
 
         async with lock:
