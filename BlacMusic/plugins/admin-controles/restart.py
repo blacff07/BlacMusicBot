@@ -110,11 +110,18 @@ async def _restart(_, m: types.Message):
     
     sent = await m.reply_text(m.lang["restarting"])
 
+    # Save restart context so we can edit message after boot
+    import json as _json
+    try:
+        with open(".restart_ctx", "w") as _f:
+            _json.dump({"chat_id": sent.chat.id, "message_id": sent.id}, _f)
+    except Exception:
+        pass
+
     # Keep downloads to allow instant reuse after restart.
     for directory in ["cache"]:
         shutil.rmtree(directory, ignore_errors=True)
 
-    await sent.edit_text(m.lang["restarted"])
     asyncio.create_task(stop())
     await asyncio.sleep(2)
 
