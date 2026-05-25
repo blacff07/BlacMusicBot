@@ -81,11 +81,27 @@ async def start(_, message: types.Message):
     private = message.chat.type == enums.ChatType.PRIVATE
 
     # Choose appropriate welcome message
-    _text = (
-        message.lang["start_pm"].format(message.from_user.first_name, app.name)
-        if private
-        else message.lang["start_gp"].format(app.name)
-    )
+    if private:
+        _text = message.lang["start_pm"].format(
+            message.from_user.first_name,
+            app.id,
+            app.name,
+        )
+    else:
+        import time as _t
+        from BlacMusic import boot as _boot
+        def _fmt_uptime(s):
+            s = int(s)
+            parts = []
+            if s >= 86400: parts.append(f"{s//86400}ᴅ")
+            if s >= 3600:  parts.append(f"{(s%86400)//3600}ʜ")
+            parts.append(f"{(s%3600)//60}ᴍ:{s%60}s")
+            return ":".join(parts) if parts else "0s"
+        _text = message.lang["start_gp"].format(
+            app.username or "",
+            app.name,
+            _fmt_uptime(_t.time() - _boot),
+        )
 
     key = buttons.start_key(message.lang, private)
     if config.START_IMG:
