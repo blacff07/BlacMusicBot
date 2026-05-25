@@ -55,6 +55,26 @@ async def main():
         logger.info(f"👑 Loaded {len(app.sudoers)} sudo users.")
         logger.info("\n🎵 ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼ started successfully! Ready to play.\n")
 
+        # Edit restart message if bot was restarted via /restart
+        import json as _json, os as _os
+        _ctx_file = ".restart_ctx"
+        if _os.path.exists(_ctx_file):
+            try:
+                with open(_ctx_file) as _f:
+                    _ctx = _json.load(_f)
+                await app.edit_message_text(
+                    chat_id=_ctx["chat_id"],
+                    message_id=_ctx["message_id"],
+                    text="<blockquote>✅ <b>ʙᴏᴛ ʀᴇꜱᴛᴀʀᴛᴇᴅ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ.</b> ʀᴇᴀᴅʏ ᴛᴏ ᴘʟᴀʏ! 🎵</blockquote>",
+                )
+                _os.remove(_ctx_file)
+            except Exception as _e:
+                logger.debug(f"Could not edit restart message: {_e}")
+                try:
+                    _os.remove(_ctx_file)
+                except Exception:
+                    pass
+
         await idle()
 
     except (KeyboardInterrupt, asyncio.CancelledError):
