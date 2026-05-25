@@ -613,6 +613,11 @@ class TgCall(PyTgCalls):
 
                 target_chat = message_chat_id if message_chat_id else chat_id
 
+                # Mark current track as skipped for completed-message UI
+                _cur_before_next = queue.get_current(chat_id)
+                if _cur_before_next and not getattr(_cur_before_next, '_skipped', None):
+                    pass  # will be set by skip command if applicable
+
                 loop_mode = await db.get_loop(chat_id)
 
                 if loop_mode == 1:
@@ -671,18 +676,58 @@ class TgCall(PyTgCalls):
                             await db.rm_chat(chat_id)
                         return
 
-                if config.CLEANUP_MSG:
+                # Update completed/skipped track message: full bar + replay/delete buttons
+                if media and media.message_id:
                     try:
-                        if media and media.message_id:
-                            await app.delete_messages(
-                                chat_id=target_chat,
-                                message_ids=media.message_id,
-                                revoke=True,
+                        _dur = getattr(media, 'duration_sec', 0)
+                        _was_skipped = getattr(media, '_skipped', False)
+                        _played_at = getattr(media, 'time', _dur)
+                        if _dur and not getattr(media, 'is_live', False):
+                            import time as _t
+                            _bl = 12
+                            _pct = min((_played_at / _dur) * 100, 100) if _was_skipped else 100.0
+                            _fi = int(round(_bl * _pct / 100))
+                            _bar = chr(8212) * _fi + chr(9679) + chr(8212) * (_bl - _fi)
+                            _fmt = lambda s: _t.strftime('%H:%M:%S' if s >= 3600 else '%M:%S', _t.gmtime(s))
+                            _p = _fmt(_played_at if _was_skipped else _dur)
+                            _d = _fmt(_dur)
+                            _icon = "⏭" if _was_skipped else "✅"
+                            _lbl = "ꜱᴋɪᴘᴘᴇᴅ" if _was_skipped else "ᴘʟᴀʏᴇᴅ"
+                            _done_text = (
+                                "<blockquote>" + _icon + " <b>" + _lbl + "</b></blockquote>"
+                                + "<blockquote>➤ <b>ᴛɪᴛʟᴇ :</b> <a href='"
+                                + getattr(media, 'url', '') + "'>"
+                                + getattr(media, 'title', '') + "</a>"
+                                + chr(10) + _bar
+                                + chr(10) + _p + " / " + _d + "</blockquote>"
                             )
+                            _done_markup = types.InlineKeyboardMarkup([[
+                                types.InlineKeyboardButton("🔁", callback_data="controls replay " + str(chat_id)),
+                                types.InlineKeyboardButton("🗑", callback_data="controls close " + str(chat_id)),
+                            ]])
+                            try:
+                                await app.edit_message_text(
+                                    chat_id=target_chat,
+                                    message_id=media.message_id,
+                                    text=_done_text,
+                                    reply_markup=_done_markup,
+                                )
+                                media.message_id = 0
+                            except Exception:
+                                if config.CLEANUP_MSG:
+                                    try:
+                                        await app.delete_messages(chat_id=target_chat, message_ids=media.message_id, revoke=True)
+                                    except Exception:
+                                        pass
+                                media.message_id = 0
+                        elif config.CLEANUP_MSG:
+                            try:
+                                await app.delete_messages(chat_id=target_chat, message_ids=media.message_id, revoke=True)
+                            except Exception:
+                                pass
                             media.message_id = 0
                     except Exception as e:
-                        logger.debug(
-                            f"Could not delete previous message in {chat_id}: {e}")
+                        logger.debug(f"Could not update completed message in {chat_id}: {e}")
 
                 if not media:
                     # ── Queue empty — Autoplay / Suggestion hook ───────────
@@ -732,10 +777,14 @@ class TgCall(PyTgCalls):
                         await self.stop(chat_id)
                         if msg:
                             try:
-                                await msg.edit_text(
-                                    _lang["error_no_file"].format(
-                                        config.SUPPORT_CHAT)
-                                )
+                                _err = _lang["error_no_file"].format(config.SUPPORT_CHAT)
+                                if not config.COOKIES_URL:
+                                    _err += (
+                                        chr(10) + chr(10) +
+                                        "<blockquote>💡 ᴀɢᴇ-ʀᴇꜱᴛʀɪᴄᴛᴇᴅ? "
+                                        "ꜱᴇᴛ <code>COOKIE_URL</code> ɪɴ .ᴇɴᴠ.</blockquote>"
+                                    )
+                                await msg.edit_text(_err)
                             except Exception:
                                 pass
                         return
