@@ -43,6 +43,7 @@ class Config:
         self.BOT_TOKEN: str = getenv("BOT_TOKEN", "")
         self.LOGGER_ID: int = int(getenv("LOGGER_ID", "0"))
         self.OWNER_ID: int = int(getenv("OWNER_ID", "0"))
+        self.OWNER_USERNAME: str = getenv("OWNER_USERNAME", "")
 
         # ── DATABASE ──────────────────────────────────────────────────────────
         self.MONGO_URL: str = getenv("MONGO_DB_URI", "")
