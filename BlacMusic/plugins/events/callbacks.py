@@ -155,6 +155,9 @@ async def _controls(_, query: types.CallbackQuery):
         reply = query.lang["play_resumed"].format(user)
 
     elif action == "skip":
+        _cur_skip = queue.get_current(chat_id)
+        if _cur_skip:
+            _cur_skip._skipped = True
         await query.answer("⏭ ꜱᴋɪᴘᴘɪɴɢ...", show_alert=False)
         await tune.play_next(chat_id)
         status = query.lang["skipped"]
@@ -300,19 +303,16 @@ async def handle_seek(query: types.CallbackQuery, chat_id: int, action: str, use
         
         # Try to send reply message with FloodWait handling and auto-delete after 5 seconds
         try:
-            sent_msg = await query.message.reply_text(
-                f"✅ ꜱᴇᴇᴋᴇᴅ ᴛᴏ {time_str}\n\n<blockquote>ʙʏ {user}</blockquote>",
-                quote=False
+            _seek_reply = (
+                "<blockquote>⏩ ꜱᴇᴇᴋᴇᴅ " + direction + " → <b>" + new_str + "</b>" +
+                chr(10) + "ʙʏ " + user + "</blockquote>"
             )
-            # Auto-delete after 5 seconds
-            await asyncio.sleep(5)
+            sent_msg = await query.message.reply_text(_seek_reply, quote=False)
+            await asyncio.sleep(4)
             try:
                 await sent_msg.delete()
             except Exception:
                 pass
-        except FloodWait as e:
-            # If rate limited, just skip the message since user already got feedback via callback
-            pass
         except Exception:
             pass
 
