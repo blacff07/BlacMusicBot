@@ -109,8 +109,6 @@ class Inline:
                 self.ikb(text=lang["channel"], url=config.SUPPORT_CHANNEL),
             ],
         ]
-        if private:
-            rows.append([self.ikb(text=lang["source"], url=config.SOURCE_URL)])
         return self.ikm(rows)
 
     def yt_key(self, link):
