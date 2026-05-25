@@ -211,12 +211,19 @@ class TgCall(PyTgCalls):
                 except Exception as dl_err:
                     logger.warning(f"Re-download failed for {chat_id}: {dl_err}")
             if not media.file_path:
+                # Delete the stuck "downloading..." message silently
                 if message:
                     try:
-                        await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
+                        await message.delete()
                     except Exception:
                         pass
-                return
+                # Skip to next track instead of stopping
+                logger.warning(f"Download failed for {getattr(media, 'id', '?')} in {chat_id} — trying next")
+                media = queue.get_next(chat_id)
+                if not media:
+                    await self.stop(chat_id)
+                    return
+                message = None  # No message for auto-skipped track
 
         # Stop previous video stream if switching to audio-only (prevents black video)
         _prev = queue.get_current(chat_id)
