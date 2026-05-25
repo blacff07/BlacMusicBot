@@ -22,10 +22,16 @@ from BlacMusic import app, db, lang
 from BlacMusic.helpers import admin_check, is_admin, utils
 
 
-@app.on_message(filters.command(["auth", "unauth"]) & filters.group & ~app.bl_users)
+@app.on_message(filters.command(["auth", "unauth"]) & ~app.bl_users)
 @lang.language()
 @admin_check
 async def _auth(_, m: types.Message):
+    from pyrogram import enums as _e
+    if m.chat.type == _e.ChatType.PRIVATE:
+        return await m.reply_text(
+            "<blockquote>⚠️ <b>/auth</b> ᴀɴᴅ <b>/unauth</b> ᴀʀᴇ ɢʀᴏᴜᴘ-ᴏɴʟʏ ᴄᴏᴍᴍᴀɴᴅꜱ."
+            + chr(10) + "ᴀᴅᴅ ᴍᴇ ᴛᴏ ᴀ ɢʀᴏᴜᴘ ᴀɴᴅ ᴜꜱᴇ ᴛʜᴇᴍ ᴛʜᴇʀᴇ.</blockquote>"
+        )
     # Auto-delete command message
     try:
         await m.delete()
@@ -47,10 +53,15 @@ async def _auth(_, m: types.Message):
         await utils.safe_text(m, m.lang["auth_removed"].format(user.mention))
 
 
-@app.on_message(filters.command(["authlist"]) & filters.group & ~app.bl_users)
+@app.on_message(filters.command(["authlist"]) & ~app.bl_users)
 @lang.language()
 @admin_check
 async def _authlist(_, m: types.Message):
+    from pyrogram import enums as _e2
+    if m.chat.type == _e2.ChatType.PRIVATE:
+        return await m.reply_text(
+            "<blockquote>⚠️ <b>/authlist</b> ɪꜱ ᴀ ɢʀᴏᴜᴘ-ᴏɴʟʏ ᴄᴏᴍᴍᴀɴᴅ.</blockquote>"
+        )
     """Display the authorized users for the chat."""
     auth_users = await db._get_auth(m.chat.id)
     if not auth_users:
