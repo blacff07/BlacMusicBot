@@ -50,13 +50,17 @@ async def _ping(_, m: types.Message):
     from BlacMusic import db
     active_chats = len(await db.get_chats())
     
+    disk = psutil.disk_usage("/")
+    disk_percent = disk.percent
     caption_text = m.lang["ping_pong"].format(
-        latency,
-        uptime,
-        await tune.ping(),
-        ram_usage,
-        cpu_percent,
-        active_chats,
+        latency,                        # {0} ping ms
+        app.username or app.name,       # {1} username for link
+        app.name,                       # {2} display name
+        uptime,                         # {3} uptime
+        ram_usage,                      # {4} ram
+        cpu_percent,                    # {5} cpu%
+        disk_percent,                   # {6} disk%
+        round(await tune.ping(), 2),    # {7} pytgcalls ms
     )
     
     # Try to send with media, fallback to text if it fails
