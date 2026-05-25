@@ -15,14 +15,6 @@ from pyrogram import enums, errors, filters, types
 from BlacMusic import app, config, db, lang
 from BlacMusic.helpers import buttons, utils
 
-# Telegram message effect IDs (randomly selected for start/help photos)
-EFFECT_IDS = [
-    5046509860389126442,
-    5107584321108051014,
-    5104841245755180586,
-    5159385139981059251,
-]
-
 # Valid reaction emojis (Telegram reaction tray)
 VALID_REACTIONS = ["👀", "💔", "⚡", "❤️", "🎉"]
 
@@ -37,35 +29,22 @@ async def _help(_, m: types.Message):
     except Exception:
         pass
 
-    effect = random.choice(EFFECT_IDS) if EFFECT_IDS else None
-    sent = None
     if config.START_IMG:
         try:
-            sent = await m.reply_photo(
+            await m.reply_photo(
                 photo=config.START_IMG,
-                message_effect_id=effect,
                 caption=m.lang["help_menu"],
                 reply_markup=buttons.help_markup(m.lang),
                 quote=True,
             )
-        except errors.MessageEffectNotSupportedInPm:
-            try:
-                sent = await m.reply_photo(
-                    photo=config.START_IMG,
-                    caption=m.lang["help_menu"],
-                    reply_markup=buttons.help_markup(m.lang),
-                    quote=True,
-                )
-            except Exception:
-                pass
+            return
         except Exception:
             pass
-    if not sent:
-        await m.reply_text(
-            text=m.lang["help_menu"],
-            reply_markup=buttons.help_markup(m.lang),
-            quote=True,
-        )
+    await m.reply_text(
+        text=m.lang["help_menu"],
+        reply_markup=buttons.help_markup(m.lang),
+        quote=True,
+    )
 
 
 @app.on_message(filters.command(["start"]))
@@ -109,29 +88,15 @@ async def start(_, message: types.Message):
     )
 
     key = buttons.start_key(message.lang, private)
-    effect = random.choice(EFFECT_IDS) if EFFECT_IDS else None
-
     if config.START_IMG:
-        _sent = None
         try:
-            _sent = await message.reply_photo(
+            await message.reply_photo(
                 photo=config.START_IMG,
-                message_effect_id=effect,
                 caption=_text,
                 reply_markup=key,
                 quote=not private,
             )
         except Exception:
-            try:
-                _sent = await message.reply_photo(
-                    photo=config.START_IMG,
-                    caption=_text,
-                    reply_markup=key,
-                    quote=not private,
-                )
-            except Exception:
-                pass
-        if not _sent:
             await message.reply_text(
                 text=_text,
                 reply_markup=key,
