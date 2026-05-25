@@ -252,7 +252,7 @@ async def play_hndlr(
     ]
     play_emoji = _rnd.choice(_EMOJI_POOL)
     
-    _search_msg = f"{play_emoji} ꜱᴇᴀʀᴄʜɪɴɢ..."
+    _search_msg = play_emoji
     try:
         sent = await safe_reply(m, _search_msg)
     except FloodWait as e:
@@ -355,7 +355,7 @@ async def play_hndlr(
             await safe_edit(
                 sent,
                 m.lang["play_queued"].format(
-                    position,  # Shows waiting position: 1, 2, 3...
+                    position,
                     file.url,
                     file.title,
                     file.duration,
@@ -365,6 +365,15 @@ async def play_hndlr(
                     chat_id, file.id, m.lang["play_now"]
                 ),
             )
+            # Auto-cleanup queued message after 25 seconds
+            if sent:
+                async def _auto_del(msg=sent):
+                    await asyncio.sleep(25)
+                    try:
+                        await msg.delete()
+                    except Exception:
+                        pass
+                asyncio.create_task(_auto_del())
             if tracks:
                 added = playlist_to_queue(chat_id, tracks)
                 try:
