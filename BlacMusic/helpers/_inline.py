@@ -101,14 +101,20 @@ class Inline:
         ])
 
     def start_key(self, lang, private=False):
-        rows = [
-            [self.ikb(text=lang["add_me"], url=f"https://t.me/{app.username}?startgroup=true")],
-            [self.ikb(text=lang["help"], callback_data="help")],
-            [
-                self.ikb(text=lang["support"], url=config.SUPPORT_CHAT),
-                self.ikb(text=lang["channel"], url=config.SUPPORT_CHANNEL),
-            ],
-        ]
+        if private:
+            rows = [
+                [self.ikb(text="➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ", url=f"https://t.me/{app.username}?startgroup=true")],
+                [
+                    self.ikb(text="🆘 ꜱᴜᴘᴘᴏʀᴛ", url=config.SUPPORT_CHAT),
+                    self.ikb(text="👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url=f"https://t.me/{config.OWNER_USERNAME}" if config.OWNER_USERNAME else config.SUPPORT_CHAT),
+                ],
+                [self.ikb(text="📖 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅꜱ", callback_data="help")],
+            ]
+        else:
+            rows = [
+                [self.ikb(text="➕ ᴀᴅᴅ ᴍᴇ", url=f"https://t.me/{app.username}?startgroup=true")],
+                [self.ikb(text="🆘 ꜱᴜᴘᴘᴏʀᴛ", url=config.SUPPORT_CHAT)],
+            ]
         return self.ikm(rows)
 
     def yt_key(self, link):
