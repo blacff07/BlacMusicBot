@@ -134,14 +134,9 @@ class TgCall(PyTgCalls):
         except Exception as e:
             logger.warning(f"Error clearing queue/call for {chat_id}: {e}")
 
-        # Release play_next lock if stuck
+        # Clear stale play_next lock by replacing it with a fresh one
         if chat_id in self._play_next_locks:
-            _lock = self._play_next_locks[chat_id]
-            if _lock.locked():
-                try:
-                    _lock.release()
-                except Exception:
-                    pass
+            self._play_next_locks[chat_id] = asyncio.Lock()
 
         # Leave call via all PyTgCalls clients
         left = False
@@ -340,13 +335,25 @@ class TgCall(PyTgCalls):
                     error_msg = str(e)
                     if "GROUPCALL_INVALID" in error_msg or "GROUPCALL" in error_msg or isinstance(e, exceptions.NoActiveGroupCall):
                         if attempt == 0:
-                            # First attempt: try to start the voice chat via assistant
-                            logger.debug(f"No active VC in {chat_id} — attempting to create one via assistant...")
+                            # First attempt: start VC via Pyrogram assistant (MTProto)
+                            logger.debug(f"No active VC in {chat_id} — creating via assistant MTProto...")
                             try:
-                                _pyrogram_client = await db.get_client(chat_id)
-                                await _pyrogram_client.create_video_chat(chat_id)
-                                await asyncio.sleep(1.5)
-                                logger.info(f"✅ Voice chat created in {chat_id}")
+                                _pyrogram_asst = await db.get_client(chat_id)
+                                # get_client returns a PyTgCalls client; get the underlying Pyrogram client
+                                _asst_pyrogram = None
+                                for _ub in userbot.clients:
+                                    if hasattr(_ub, 'me') and _ub.me and _ub.me.id:
+                                        _asst_pyrogram = _ub
+                                        break
+                                if _asst_pyrogram:
+                                    await _asst_pyrogram.invoke(
+                                        __import__('pyrogram.raw.functions.phone', fromlist=['CreateGroupCall']).CreateGroupCall(
+                                            peer=await _asst_pyrogram.resolve_peer(chat_id),
+                                            random_id=__import__('random').randint(1000, 9999999),
+                                        )
+                                    )
+                                    await asyncio.sleep(2)
+                                    logger.info(f"✅ Voice chat created in {chat_id}")
                             except Exception as vc_err:
                                 logger.warning(f"⚠️ Could not create VC in {chat_id}: {vc_err}")
                                 await asyncio.sleep(retry_delay)
@@ -582,18 +589,7 @@ class TgCall(PyTgCalls):
         lock = self._play_next_locks[chat_id]
 
         if lock.locked():
-            # Wait briefly for current play_next to finish (handles rapid skip)
-            try:
-                await asyncio.wait_for(asyncio.shield(lock.acquire()), timeout=8.0)
-                lock.release()
-            except asyncio.TimeoutError:
-                logger.warning(f"play_next lock timeout for {chat_id} — forcing reset")
-                # Force-release the lock to prevent permanent freeze
-                try:
-                    if lock.locked():
-                        lock.release()
-                except Exception:
-                    pass
+            logger.debug(f"play_next already running for {chat_id}, skipping duplicate")
             return
 
         async with lock:
