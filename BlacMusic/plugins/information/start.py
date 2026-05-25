@@ -1,3 +1,4 @@
+import asyncio
 # ==============================================================================
 # start.py - Start Command and Basic Bot Interactions
 # ==============================================================================
@@ -12,6 +13,19 @@ from pyrogram import enums, errors, filters, types
 
 from BlacMusic import app, config, db, lang
 from BlacMusic.helpers import buttons, utils
+
+
+async def _send_reaction(app, message, emoji):
+    """Send animated reaction non-blocking."""
+    try:
+        await app.send_reaction(
+            chat_id=message.chat.id,
+            message_id=message.id,
+            emoji=emoji,
+            big=True,
+        )
+    except Exception:
+        pass
 
 
 @app.on_message(filters.command(["help"]) & filters.private & ~app.bl_users)
@@ -98,9 +112,8 @@ async def start(_, message: types.Message):
         quote=not private,
     )
 
-    # For private chats, add user to database if new
+    # For private chats — send animated reaction to EVERY /start
     if private:
-        # Send random animated reaction to their message
         import random as _random
         _reactions = [
             "🌷","🌹","👀","👁","👣","🫶","🫰","🎩","🦋","🕸",
@@ -109,15 +122,7 @@ async def start(_, message: types.Message):
             "🦠","🎉","🎊","🪄","💌","🪩","🧮","❤️‍🩹","💝","💗",
             "💞","💔","🖤","💢","💯","🎶","🎵","🔎"
         ]
-        try:
-            await app.send_reaction(
-                chat_id=message.chat.id,
-                message_id=message.id,
-                emoji=_random.choice(_reactions),
-                big=True,
-            )
-        except Exception:
-            pass
+        asyncio.create_task(_send_reaction(app, message, _random.choice(_reactions)))
 
         if await db.is_user(message.from_user.id):
             return  # User already exists, no need to add
