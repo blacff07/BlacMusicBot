@@ -1,4 +1,5 @@
 import asyncio
+import random
 # ==============================================================================
 # start.py - Start Command and Basic Bot Interactions
 # ==============================================================================
@@ -14,18 +15,16 @@ from pyrogram import enums, errors, filters, types
 from BlacMusic import app, config, db, lang
 from BlacMusic.helpers import buttons, utils
 
+# Telegram message effect IDs (randomly selected for start/help photos)
+EFFECT_IDS = [
+    5046509860389126442,
+    5107584321108051014,
+    5104841245755180586,
+    5159385139981059251,
+]
 
-async def _send_reaction(app, message, emoji):
-    """Send animated reaction non-blocking."""
-    try:
-        await app.send_reaction(
-            chat_id=message.chat.id,
-            message_id=message.id,
-            emoji=emoji,
-            big=True,
-        )
-    except Exception:
-        pass
+# Valid reaction emojis (Telegram reaction tray)
+VALID_REACTIONS = ["👀", "💔", "⚡", "❤️", "🎉"]
 
 
 @app.on_message(filters.command(["help"]) & filters.private & ~app.bl_users)
@@ -37,16 +36,31 @@ async def _help(_, m: types.Message):
         await m.delete()
     except Exception:
         pass
-    
-    try:
-        await m.reply_photo(
-            photo=config.START_IMG,  # Use same image as start command
-            caption=m.lang["help_menu"],
-            reply_markup=buttons.help_markup(m.lang),
-            quote=True,
-        )
-    except Exception:
-        # Fallback to text if photo fails
+
+    effect = random.choice(EFFECT_IDS) if EFFECT_IDS else None
+    sent = None
+    if config.START_IMG:
+        try:
+            sent = await m.reply_photo(
+                photo=config.START_IMG,
+                message_effect_id=effect,
+                caption=m.lang["help_menu"],
+                reply_markup=buttons.help_markup(m.lang),
+                quote=True,
+            )
+        except errors.MessageEffectNotSupportedInPm:
+            try:
+                sent = await m.reply_photo(
+                    photo=config.START_IMG,
+                    caption=m.lang["help_menu"],
+                    reply_markup=buttons.help_markup(m.lang),
+                    quote=True,
+                )
+            except Exception:
+                pass
+        except Exception:
+            pass
+    if not sent:
         await m.reply_text(
             text=m.lang["help_menu"],
             reply_markup=buttons.help_markup(m.lang),
@@ -71,7 +85,7 @@ async def start(_, message: types.Message):
             await message.delete()
         except Exception:
             pass
-    
+
     # Skip if message from channel or anonymous admin
     if not message.from_user:
         return
@@ -95,34 +109,54 @@ async def start(_, message: types.Message):
     )
 
     key = buttons.start_key(message.lang, private)
+    effect = random.choice(EFFECT_IDS) if EFFECT_IDS else None
+
     if config.START_IMG:
+        _sent = None
         try:
-            await message.reply_photo(
+            _sent = await message.reply_photo(
                 photo=config.START_IMG,
+                message_effect_id=effect,
                 caption=_text,
                 reply_markup=key,
                 quote=not private,
             )
-            return
+        except Exception:
+            try:
+                _sent = await message.reply_photo(
+                    photo=config.START_IMG,
+                    caption=_text,
+                    reply_markup=key,
+                    quote=not private,
+                )
+            except Exception:
+                pass
+        if not _sent:
+            await message.reply_text(
+                text=_text,
+                reply_markup=key,
+                quote=not private,
+            )
+    else:
+        await message.reply_text(
+            text=_text,
+            reply_markup=key,
+            quote=not private,
+        )
+
+    # For private chats — send random reaction, log, and add user to database
+    if private:
+        # Send a valid reaction from the list
+        try:
+            reaction_emoji = random.choice(VALID_REACTIONS)
+            await app.send_reaction(
+                chat_id=message.chat.id,
+                message_id=message.id,
+                emoji=reaction_emoji,
+                big=True,
+            )
         except Exception:
             pass
-    await message.reply_text(
-        text=_text,
-        reply_markup=key,
-        quote=not private,
-    )
-
-    # For private chats — send animated reaction to EVERY /start
-    if private:
-        import random as _random
-        _reactions = [
-            "🌷","🌹","👀","👁","👣","🫶","🫰","🎩","🦋","🕸",
-            "🐾","💫","💥","❄️","🍾","🥂","🧃","🍭","🎗","🎨",
-            "🎧","🚀","🎢","💡","💣","🧨","⚰","🔮","🧪","🌡",
-            "🦠","🎉","🎊","🪄","💌","🪩","🧮","❤️‍🩹","💝","💗",
-            "💞","💔","🖤","💢","💯","🎶","🎵","🔎"
-        ]
-        asyncio.create_task(_send_reaction(app, message, _random.choice(_reactions)))
 
         if await db.is_user(message.from_user.id):
             return  # User already exists, no need to add
@@ -148,8 +182,8 @@ async def settings(_, message: types.Message):
         await message.delete()
     except Exception:
         pass
-    
-    admin_only = await db.get_play_mode(message.chat.id)  # Get play mode setting
+
+    admin_only = await db.get_play_mode(message.chat.id)
     _language = "en"
     await utils.safe_text(
         message,
