@@ -19,7 +19,7 @@ from BlacMusic.helpers import buttons, utils
 VALID_REACTIONS = ["👀", "💔", "⚡", "❤️", "🎉"]
 
 
-@app.on_message(filters.command(["help"]) & filters.private & ~app.bl_users)
+@app.on_message(filters.command(["help"]) & ~app.bl_users)
 @lang.language()
 async def _help(_, m: types.Message):
     """Handle /help command in private chats - shows help menu with image."""
@@ -32,7 +32,7 @@ async def _help(_, m: types.Message):
     if config.START_IMG:
         try:
             await m.reply_photo(
-                photo=config.START_IMG,
+                photo=config.HELP_IMG or config.START_IMG,
                 caption=m.lang["help_menu"],
                 reply_markup=buttons.help_markup(m.lang),
                 quote=True,
@@ -82,8 +82,13 @@ async def start(_, message: types.Message):
 
     # Choose appropriate welcome message
     if private:
+        # Hyperlink sender's name to their Telegram profile
+        _user_link = (
+            "<a href='tg://user?id=" + str(message.from_user.id) + "'>"
+            + message.from_user.first_name + "</a>"
+        )
         _text = message.lang["start_pm"].format(
-            message.from_user.first_name,
+            _user_link,
             app.id,
             app.name,
         )
@@ -104,20 +109,31 @@ async def start(_, message: types.Message):
         )
 
     key = buttons.start_key(message.lang, private)
+    _effect = random.choice(_EFFECT_IDS) if private else None
     if config.START_IMG:
         try:
+            _kw = {"message_effect_id": _effect} if _effect else {}
             await message.reply_photo(
                 photo=config.START_IMG,
                 caption=_text,
                 reply_markup=key,
                 quote=not private,
+                **_kw,
             )
         except Exception:
-            await message.reply_text(
-                text=_text,
-                reply_markup=key,
-                quote=not private,
-            )
+            try:
+                await message.reply_photo(
+                    photo=config.START_IMG,
+                    caption=_text,
+                    reply_markup=key,
+                    quote=not private,
+                )
+            except Exception:
+                await message.reply_text(
+                    text=_text,
+                    reply_markup=key,
+                    quote=not private,
+                )
     else:
         await message.reply_text(
             text=_text,
