@@ -306,7 +306,7 @@ class TgCall(PyTgCalls):
 
         video_flags = (
             types.MediaStream.Flags.AUTO_DETECT
-            if is_video
+            if _is_video
             else types.MediaStream.Flags.IGNORE
         )
 
