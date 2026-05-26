@@ -94,7 +94,8 @@ async def send_suggestions(chat_id: int, target_chat: int, last_msg_id: int = 0)
 
     last_query = await db.get_last_query(chat_id)
     if not last_query:
-        return
+        # Fallback query when no history
+        last_query = "popular music"
 
     try:
         suggestions = await _search_multi(last_query, count=3, chat_id=chat_id)
@@ -183,6 +184,8 @@ async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
 
     queue.force_add(chat_id, track)
     try:
+        from BlacMusic import tune, db as _db
+        await _db.add_call(chat_id)
         await tune.play_media(chat_id, msg, track)
     except Exception as e:
         logger.debug(f"Autoplay: play_media failed for {chat_id}: {e}")
