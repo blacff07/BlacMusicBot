@@ -225,18 +225,22 @@ class TgCall(PyTgCalls):
                     return
                 message = None  # No message for auto-skipped track
 
-        # Stop previous video stream if switching to audio-only (prevents black video)
-        _prev = queue.get_current(chat_id)
-        _prev_was_video = _prev and getattr(_prev, 'video', False)
-        _this_is_audio = not getattr(media, 'video', False) and not getattr(media, 'is_live', False)
-        if _prev_was_video and _this_is_audio:
-            for _vc_client in self.clients:
-                try:
-                    await _vc_client.leave_call(chat_id)
-                    await asyncio.sleep(0.5)
-                    break
-                except Exception:
-                    pass
+        # ── PATCHED: Force Drop Video Frame Pipeline ──────────────────────────
+        _is_video = getattr(media, "video", False)
+        try:
+            active_call = await client.get_call(chat_id)
+            if active_call and not _is_video:
+                _cur_flags = getattr(active_call, 'video_flags', None)
+                _was_video = _cur_flags is not None and _cur_flags != types.MediaStream.Flags.IGNORE
+                if _was_video:
+                    logger.debug(f"Video→Audio transition for {chat_id}. Force-dropping video pipeline.")
+                    try:
+                        await client.leave_call(chat_id, close=True)
+                        await asyncio.sleep(0.75)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
         # Validate chat_id - check if it's a valid channel/group
         try:
@@ -300,7 +304,6 @@ class TgCall(PyTgCalls):
             # - sync ext: External sync (reduces A/V desync)
             ffmpeg_params = "-probesize 10M -analyzeduration 5M -rtbufsize 5M -fflags +genpts+igndts -sync ext"
 
-        is_video = getattr(media, "video", False)
         video_flags = (
             types.MediaStream.Flags.AUTO_DETECT
             if is_video
@@ -697,12 +700,14 @@ class TgCall(PyTgCalls):
                             _icon = "⏭" if _was_skipped else "✅"
                             _lbl = "ꜱᴋɪᴘᴘᴇᴅ" if _was_skipped else "ᴘʟᴀʏᴇᴅ"
                             _done_text = (
-                                "<blockquote>" + _icon + " <b>" + _lbl + "</b></blockquote>"
-                                + "<blockquote>➤ <b>ᴛɪᴛʟᴇ :</b> <a href='"
+                                "<blockquote>🎧 <b>ꜱᴛʀᴇᴀᴍ " + _lbl + "</b>"
+                                + chr(10) + "➤ <b>ᴛɪᴛʟᴇ :</b> <a href='"
                                 + getattr(media, 'url', '') + "'>"
                                 + getattr(media, 'title', '') + "</a>"
-                                + chr(10) + _bar
-                                + chr(10) + _p + " / " + _d + "</blockquote>"
+                                + chr(10) + "➤ <b>ᴅᴜʀᴀᴛɪᴏɴ :</b> "
+                                + getattr(media, 'duration', '?') + " ᴍɪɴᴜᴛᴇꜱ"
+                                + chr(10) + "➤ <b>ʙʏ :</b> "
+                                + str(getattr(media, 'user', '')) + "</blockquote>"
                             )
                             _done_markup = types.InlineKeyboardMarkup([[
                                 types.InlineKeyboardButton("🔁", callback_data="controls replay " + str(chat_id)),
