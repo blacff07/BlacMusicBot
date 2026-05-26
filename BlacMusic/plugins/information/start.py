@@ -15,6 +15,14 @@ from pyrogram import enums, errors, filters, types
 from BlacMusic import app, config, db, lang
 from BlacMusic.helpers import buttons, utils
 
+# Telegram message effect IDs — visible to Premium users only, silently ignored otherwise
+_EFFECT_IDS = [
+    5046509860389126442,
+    5107584321108051014,
+    5104841245755180586,
+    5159385139981059251,
+]
+
 # Valid reaction emojis (Telegram reaction tray)
 VALID_REACTIONS = ["👀", "💔", "⚡", "❤️", "🎉"]
 
