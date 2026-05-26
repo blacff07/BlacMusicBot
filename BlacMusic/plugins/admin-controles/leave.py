@@ -77,13 +77,6 @@ async def _leaveall(_, m: types.Message):
     except Exception:
         pass
     
-    # DM guard
-    from pyrogram import enums as _e2
-    if m.chat.type == _e2.ChatType.PRIVATE:
-        return await m.reply_text(
-            "<blockquote>⚠️ <b>/leaveall</b> ᴄᴀɴ ᴏɴʟʏ ʙᴇ ᴜꜱᴇᴅ ɪɴ ᴀ ɢʀᴏᴜᴘ ᴏʀ ᴅɪʀᴇᴄᴛʟʏ ᴠɪᴀ ꜱᴜᴅᴏ.</blockquote>"
-        )
-
     sent = await m.reply_text(
         "<blockquote><b>🔄 ᴘʀᴏᴄᴇꜱꜱɪɴɢ...</b>"
         + chr(10) + "ᴍᴀᴋɪɴɢ ᴀꜱꜱɪꜱᴛᴀɴᴛꜱ ʟᴇᴀᴠᴇ ᴀʟʟ ɪɴᴀᴄᴛɪᴠᴇ ɢʀᴏᴜᴘꜱ...</blockquote>"
