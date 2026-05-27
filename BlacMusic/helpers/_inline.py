@@ -10,19 +10,23 @@ class Inline:
     def cancel_dl(self, text) -> types.InlineKeyboardMarkup:
         return self.ikm([[self.ikb(text=text, callback_data="cancel_dl")]])
 
-    def controls(self, chat_id, status=None, timer=None, remove=False):
+    def controls(self, chat_id, status=None, timer=None, remove=False, paused=False):
         keyboard = []
+        # Status row — shows paused/playing state or timer bar
+        _is_paused = paused or (status and "ᴘᴀᴜꜱᴇᴅ" in str(status))
         if status:
             keyboard.append([self.ikb(text=status, callback_data=f"controls status {chat_id}")])
         elif timer:
             keyboard.append([self.ikb(text=timer, callback_data=f"controls status {chat_id}")])
         if not remove:
-            keyboard.append([
-                self.ikb(text="« 30", callback_data=f"controls seek_back_30 {chat_id}"),
-                self.ikb(text="« 10", callback_data=f"controls seek_back_10 {chat_id}"),
-                self.ikb(text="10 »", callback_data=f"controls seek_forward_10 {chat_id}"),
-                self.ikb(text="30 »", callback_data=f"controls seek_forward_30 {chat_id}"),
-            ])
+            # Seek buttons — hidden when paused
+            if not _is_paused:
+                keyboard.append([
+                    self.ikb(text="« 30", callback_data=f"controls seek_back_30 {chat_id}"),
+                    self.ikb(text="« 10", callback_data=f"controls seek_back_10 {chat_id}"),
+                    self.ikb(text="10 »", callback_data=f"controls seek_forward_10 {chat_id}"),
+                    self.ikb(text="30 »", callback_data=f"controls seek_forward_30 {chat_id}"),
+                ])
             keyboard.append([
                 self.ikb(text="▷",   callback_data=f"controls resume {chat_id}"),
                 self.ikb(text="II",  callback_data=f"controls pause {chat_id}"),
