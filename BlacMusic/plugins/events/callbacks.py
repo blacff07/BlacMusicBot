@@ -198,6 +198,10 @@ async def _controls(_, query: types.CallbackQuery):
         reply = query.lang["play_replayed"].format(user)
 
     elif action == "stop":
+        # Mark current track as stopped before stopping
+        _cur_stop = queue.get_current(chat_id)
+        if _cur_stop:
+            _cur_stop._stopped = True
         await query.answer("⏹ ꜱᴛᴏᴘᴘɪɴɢ...", show_alert=False)
         await tune.stop(chat_id)
         status = query.lang["stopped"]
