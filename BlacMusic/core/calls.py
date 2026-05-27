@@ -707,6 +707,7 @@ class TgCall(PyTgCalls):
                         pass
                     _current.file_path = None
 
+                _prev_track = queue.get_current(chat_id)  # Save before get_next advances queue
                 media = queue.get_next(chat_id)
 
                 if not media and loop_mode == 10:
@@ -734,12 +735,16 @@ class TgCall(PyTgCalls):
                         return
 
                 # Update completed/skipped track message: full bar + replay/delete buttons
-                if media and media.message_id:
+                _track_to_edit = _prev_track if not media else _prev_track
+                if _track_to_edit and _track_to_edit.message_id:
+                    media = media  # keep new track reference
+                if _prev_track and _prev_track.message_id:
                     try:
-                        _dur = getattr(media, 'duration_sec', 0)
-                        _was_skipped = getattr(media, '_skipped', False)
-                        _played_at = getattr(media, 'time', _dur)
-                        if _dur and not getattr(media, 'is_live', False):
+                        _et = _prev_track  # edit the track that just finished
+                        _dur = getattr(_et, 'duration_sec', 0)
+                        _was_skipped = getattr(_et, '_skipped', False)
+                        _played_at = getattr(_et, 'time', _dur)
+                        if _dur and not getattr(_et, 'is_live', False):
                             import time as _t
                             _bl = 12
                             _pct = min((_played_at / _dur) * 100, 100) if _was_skipped else 100.0
@@ -753,12 +758,12 @@ class TgCall(PyTgCalls):
                             _done_text = (
                                 "<blockquote>🎧 <b>ꜱᴛʀᴇᴀᴍ " + _lbl + "</b>"
                                 + chr(10) + "➤ <b>ᴛɪᴛʟᴇ :</b> <a href='"
-                                + getattr(media, 'url', '') + "'>"
-                                + getattr(media, 'title', '') + "</a>"
+                                + getattr(_et, 'url', '') + "'>"
+                                + getattr(_et, 'title', '') + "</a>"
                                 + chr(10) + "➤ <b>ᴅᴜʀᴀᴛɪᴏɴ :</b> "
-                                + getattr(media, 'duration', '?') + " ᴍɪɴᴜᴛᴇꜱ"
+                                + getattr(_et, 'duration', '?') + " ᴍɪɴᴜᴛᴇꜱ"
                                 + chr(10) + "➤ <b>ʙʏ :</b> "
-                                + str(getattr(media, 'user', '')) + "</blockquote>"
+                                + str(getattr(_et, 'user', '')) + "</blockquote>"
                             )
                             _done_markup = types.InlineKeyboardMarkup([[
                                 types.InlineKeyboardButton("🔁", callback_data="controls replay " + str(chat_id)),
@@ -767,24 +772,24 @@ class TgCall(PyTgCalls):
                             try:
                                 await app.edit_message_text(
                                     chat_id=target_chat,
-                                    message_id=media.message_id,
+                                    message_id=_et.message_id,
                                     text=_done_text,
                                     reply_markup=_done_markup,
                                 )
-                                media.message_id = 0
+                                _et.message_id = 0
                             except Exception:
                                 if config.CLEANUP_MSG:
                                     try:
-                                        await app.delete_messages(chat_id=target_chat, message_ids=media.message_id, revoke=True)
+                                        await app.delete_messages(chat_id=target_chat, message_ids=_et.message_id, revoke=True)
                                     except Exception:
                                         pass
-                                media.message_id = 0
+                                _et.message_id = 0
                         elif config.CLEANUP_MSG:
                             try:
-                                await app.delete_messages(chat_id=target_chat, message_ids=media.message_id, revoke=True)
+                                await app.delete_messages(chat_id=target_chat, message_ids=_et.message_id, revoke=True)
                             except Exception:
                                 pass
-                            media.message_id = 0
+                            _et.message_id = 0
                     except Exception as e:
                         logger.debug(f"Could not update completed message in {chat_id}: {e}")
 
@@ -903,7 +908,7 @@ class TgCall(PyTgCalls):
             @client.on_update()
             async def update_handler(_, update: types.Update) -> None:
                 if isinstance(update, types.StreamEnded):
-                    if update.stream_type == types.StreamEnded.Type.AUDIO:
+                    if update.stream_type in (types.StreamEnded.Type.AUDIO, types.StreamEnded.Type.VIDEO):
                         chat_id = update.chat_id
                         current_time = asyncio.get_event_loop().time()
 
