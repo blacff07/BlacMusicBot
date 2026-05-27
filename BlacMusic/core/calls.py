@@ -159,6 +159,51 @@ class TgCall(PyTgCalls):
         if not left:
             logger.debug(f"Could not leave call for {chat_id} — already ended or not in call")
 
+    async def _run_timer(self, chat_id: int, target_chat: int, media) -> None:
+        """Periodically update the progress bar on the now-playing card (every 15s)."""
+        import time as _t
+        update_interval = 15  # seconds between edits
+        await asyncio.sleep(update_interval)
+        while True:
+            try:
+                # Stop if track changed or bot stopped
+                cur = queue.get_current(chat_id)
+                if not cur or cur.id != media.id or not media.message_id:
+                    break
+                if not await db.get_call(chat_id):
+                    break
+                # Increment tracked time
+                media.time = getattr(media, 'time', 1) + update_interval
+                dur = media.duration_sec
+                if dur and media.time >= dur:
+                    media.time = dur
+                    break
+                # Build bar
+                pct = min((media.time / dur) * 100, 100)
+                filled = int(round(12 * pct / 100))
+                bar = chr(8212) * filled + chr(9679) + chr(8212) * (12 - filled)
+                fmt = lambda s: _t.strftime('%H:%M:%S' if dur >= 3600 else '%M:%S', _t.gmtime(s))
+                timer_text = f"{fmt(media.time)} {bar} {fmt(dur)}"
+
+                # Check if paused — don't update if paused
+                _is_playing = await db.playing(chat_id)
+                if not _is_playing:
+                    await asyncio.sleep(update_interval)
+                    continue
+
+                new_markup = buttons.controls(chat_id, timer=timer_text)
+                try:
+                    await app.edit_message_reply_markup(
+                        chat_id=target_chat,
+                        message_id=media.message_id,
+                        reply_markup=new_markup,
+                    )
+                except Exception:
+                    pass
+            except Exception:
+                break
+            await asyncio.sleep(update_interval)
+
     async def play_media(
         self,
         chat_id: int,
@@ -448,6 +493,12 @@ class TgCall(PyTgCalls):
                 )
                 if sent_photo:
                     media.message_id = sent_photo.id
+
+                # Start periodic timer bar updater (updates every 15s)
+                if not getattr(media, 'is_live', False) and media.duration_sec:
+                    asyncio.create_task(
+                        self._run_timer(chat_id, target_chat_for_messages, media)
+                    )
 
                 try:
                     asyncio.create_task(
@@ -785,16 +836,23 @@ class TgCall(PyTgCalls):
                         await self.stop(chat_id)
                         if msg:
                             try:
-                                _err = _lang["error_no_file"].format(config.SUPPORT_CHAT)
-                                if not config.COOKIES_URL:
-                                    _err += (
-                                        chr(10) + chr(10) +
-                                        "<blockquote>💡 ᴀɢᴇ-ʀᴇꜱᴛʀɪᴄᴛᴇᴅ? "
-                                        "ꜱᴇᴛ <code>COOKIE_URL</code> ɪɴ .ᴇɴᴠ.</blockquote>"
-                                    )
-                                await msg.edit_text(_err)
+                                # Delete stuck "downloading" message — no error card, no buttons
+                                await msg.delete()
                             except Exception:
                                 pass
+                        # Try skipping to next song
+                        _fallback = queue.get_next(chat_id)
+                        if _fallback:
+                            if not _fallback.file_path:
+                                _fallback.file_path = await yt.download(
+                                    _fallback.id,
+                                    is_live=getattr(_fallback, 'is_live', False),
+                                    video=getattr(_fallback, 'video', False),
+                                )
+                            if _fallback.file_path:
+                                await self.play_media(chat_id, None, _fallback, message_chat_id=message_chat_id)
+                                return
+                        await self.stop(chat_id)
                         return
 
                 try:
