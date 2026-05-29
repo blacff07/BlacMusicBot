@@ -508,9 +508,16 @@ class TgCall(PyTgCalls):
         except FileNotFoundError:
             if message:
                 try:
-                    await message.edit_text(_lang["error_no_file"].format(config.SUPPORT_CHAT))
+                    await message.delete()
                 except Exception:
                     pass
+            try:
+                await app.send_message(
+                    chat_id=target_chat_for_messages,
+                    text=_lang["error_no_file"].format(config.SUPPORT_CHAT),
+                )
+            except Exception:
+                pass
             await self.play_next(chat_id)
         except exceptions.NoActiveGroupCall:
             await self.stop(chat_id)
@@ -696,16 +703,21 @@ class TgCall(PyTgCalls):
                         return
 
                 # Clear file_path of current track before getting next
-                # Stale paths cause silent playback on second song
+                # But only if the next track is a DIFFERENT song (same song replay = keep file)
                 _current = queue.get_current(chat_id)
-                if _current and _current.file_path and not getattr(_current, 'is_live', False):
+                _next_preview = queue.peek_next(chat_id) if hasattr(queue, 'peek_next') else None
+                _same_song = _next_preview and _current and _next_preview.id == _current.id
+                if _current and _current.file_path and not getattr(_current, 'is_live', False) and not _same_song:
                     try:
                         import os as _os
                         if _os.path.exists(_current.file_path):
                             _os.remove(_current.file_path)
                     except Exception:
                         pass
-                    _current.file_path = None
+                    # Don't set file_path = None — next download creates a new file
+                    # Only clear if file was actually deleted
+                    if not _os.path.exists(_current.file_path):
+                        _current.file_path = None
 
                 _prev_track = queue.get_current(chat_id)  # Save before get_next advances queue
                 media = queue.get_next(chat_id)
