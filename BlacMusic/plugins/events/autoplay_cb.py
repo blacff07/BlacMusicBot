@@ -112,6 +112,7 @@ async def autoplay_pick_cb(_, cq: types.CallbackQuery):
 
             queue.force_add(chat_id, track)
             try:
+                await db.add_call(chat_id)
                 await tune.play_media(chat_id, msg, track)
             except Exception as e:
                 logger.debug(f"Autoplay pick: play_media failed: {e}")
