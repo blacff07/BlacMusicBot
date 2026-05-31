@@ -139,8 +139,7 @@ async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
     if not last_query:
         return
 
-    asyncio.create_task(send_suggestions(chat_id, target_chat))
-
+    # Autoplay ON = play automatically, no suggestion strip needed
     # Vary query with random modifier to get fresh results each time
     _mod = random.choice(_MOOD_MODIFIERS)
     _varied = f"{last_query} {_mod}"
