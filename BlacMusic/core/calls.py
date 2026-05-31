@@ -747,9 +747,6 @@ class TgCall(PyTgCalls):
                         return
 
                 # Update completed/skipped track message: full bar + replay/delete buttons
-                _track_to_edit = _prev_track if not media else _prev_track
-                if _track_to_edit and _track_to_edit.message_id:
-                    media = media  # keep new track reference
                 if _prev_track and _prev_track.message_id:
                     try:
                         _et = _prev_track  # edit the track that just finished
@@ -765,8 +762,13 @@ class TgCall(PyTgCalls):
                             _fmt = lambda s: _t.strftime('%H:%M:%S' if s >= 3600 else '%M:%S', _t.gmtime(s))
                             _p = _fmt(_played_at if _was_skipped else _dur)
                             _d = _fmt(_dur)
-                            _icon = "⏭" if _was_skipped else "✅"
-                            _lbl = "ꜱᴋɪᴘᴘᴇᴅ" if _was_skipped else "ᴘʟᴀʏᴇᴅ"
+                            _stopped = getattr(_et, '_stopped', False)
+                            if _was_skipped:
+                                _icon, _lbl = "⏭", "ꜱᴋɪᴘᴘᴇᴅ"
+                            elif _stopped:
+                                _icon, _lbl = "⏹", "ꜱᴛᴏᴘᴘᴇᴅ"
+                            else:
+                                _icon, _lbl = "✅", "ꜰɪɴɪꜱʜᴇᴅ"
                             _done_text = (
                                 "<blockquote>🎧 <b>ꜱᴛʀᴇᴀᴍ " + _lbl + "</b>"
                                 + chr(10) + "➤ <b>ᴛɪᴛʟᴇ :</b> <a href='"
@@ -870,6 +872,12 @@ class TgCall(PyTgCalls):
                                 await self.play_media(chat_id, None, _fallback, message_chat_id=message_chat_id)
                                 return
                         await self.stop(chat_id)
+                        for _vc in self.clients:
+                            try:
+                                await _vc.leave_call(chat_id)
+                                break
+                            except Exception:
+                                pass
                         return
 
                 try:
