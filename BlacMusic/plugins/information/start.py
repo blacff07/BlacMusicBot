@@ -8,6 +8,8 @@ import random
 # - /help command (show help menu)
 # - /playmode or /settings command (group settings)
 # - New member detection (when bot joins a group)
+#
+# IMPROVED: message_effect_id now works by using app.send_message() directly
 # ==============================================================================
 
 from pyrogram import enums, errors, filters, types
@@ -118,36 +120,93 @@ async def start(_, message: types.Message):
 
     key = buttons.start_key(message.lang, private)
     _effect = random.choice(_EFFECT_IDS) if private else None
+    
+    # IMPROVED: Use send_message with message_effect_id for better support
+    # message_effect_id only works in private chats and for Premium users
     if config.START_IMG:
         try:
-            _kw = {"message_effect_id": _effect} if _effect else {}
-            await message.reply_photo(
-                photo=config.START_IMG,
-                caption=_text,
-                reply_markup=key,
-                quote=not private,
-                **_kw,
-            )
-        except Exception:
-            try:
+            if private and _effect:
+                # Direct API method for proper message_effect_id support
+                try:
+                    await app.send_photo(
+                        chat_id=message.chat.id,
+                        photo=config.START_IMG,
+                        caption=_text,
+                        reply_markup=key,
+                        reply_to_message_id=message.id,
+                        message_effect_id=_effect,
+                    )
+                except TypeError:
+                    # Fallback if this version doesn't support message_effect_id parameter
+                    await message.reply_photo(
+                        photo=config.START_IMG,
+                        caption=_text,
+                        reply_markup=key,
+                        quote=not private,
+                    )
+            else:
+                # Group chat or no effect ID — use standard method
                 await message.reply_photo(
                     photo=config.START_IMG,
                     caption=_text,
                     reply_markup=key,
                     quote=not private,
                 )
+        except Exception:
+            # Fallback to text message if photo fails
+            try:
+                if private and _effect:
+                    await app.send_message(
+                        chat_id=message.chat.id,
+                        text=_text,
+                        reply_markup=key,
+                        reply_to_message_id=message.id,
+                        message_effect_id=_effect,
+                    )
+                else:
+                    await message.reply_text(
+                        text=_text,
+                        reply_markup=key,
+                        quote=not private,
+                    )
             except Exception:
+                # Last resort fallback
                 await message.reply_text(
                     text=_text,
                     reply_markup=key,
                     quote=not private,
                 )
     else:
-        await message.reply_text(
-            text=_text,
-            reply_markup=key,
-            quote=not private,
-        )
+        # No image configured — send text message
+        try:
+            if private and _effect:
+                await app.send_message(
+                    chat_id=message.chat.id,
+                    text=_text,
+                    reply_markup=key,
+                    reply_to_message_id=message.id,
+                    message_effect_id=_effect,
+                )
+            else:
+                await message.reply_text(
+                    text=_text,
+                    reply_markup=key,
+                    quote=not private,
+                )
+        except TypeError:
+            # Fallback if message_effect_id not supported
+            await message.reply_text(
+                text=_text,
+                reply_markup=key,
+                quote=not private,
+            )
+        except Exception as e:
+            logger.warning(f"Error sending start message: {e}")
+            await message.reply_text(
+                text=_text,
+                reply_markup=key,
+                quote=not private,
+            )
 
     # For private chats — send random reaction, log, and add user to database
     if private:
