@@ -59,7 +59,7 @@ async def _search_multi(base_query: str, count: int = 3, chat_id: int = 0):
                 s = VideosSearch(q, limit=3)
                 return s.next()
 
-            data = await asyncio.get_event_loop().run_in_executor(None, _do_search)
+            data = await asyncio.get_running_loop().run_in_executor(None, _do_search)
             data_list = data.get("result", [])
             for item in data_list:
                 vid_id = item.get("id")
@@ -167,13 +167,14 @@ async def trigger_autoplay(chat_id: int, target_chat: int) -> None:
         logger.debug(f"Autoplay: download failed for {track.id}: {e}")
         return
 
+    track.user = "ᴀᴜᴛᴏᴘʟᴀʏ"  # Set user field for now-playing card
     try:
         msg = await app.send_message(
             chat_id=target_chat,
             text=(
-                f"<blockquote>🔁 <b>ᴀᴜᴛᴏᴘʟᴀʏ</b>\n\n"
-                f"▶ <a href='{track.url}'>{track.title}</a>\n"
-                f"⏱ {track.duration}</blockquote>"
+                "<blockquote>🔁 <b>ᴀᴜᴛᴏᴘʟᴀʏ</b>" + chr(10) + chr(10)
+                + "▶ <a href='" + track.url + "'>" + track.title + "</a>" + chr(10)
+                + "⏱ " + str(track.duration) + "</blockquote>"
             ),
         )
         track.message_id = msg.id
