@@ -12,7 +12,7 @@
 # Usage: @BlacMusicBot search query
 # ==============================================================================
 
-from py_yt import VideosSearch
+from youtubesearchpython import VideosSearch
 from pyrogram import types
 
 from BlacMusic import app
