@@ -176,6 +176,12 @@ class YouTube:
         return None
 
     async def search(self, query: str, m_id: int) -> Track | None:
+        """
+        Search for a YouTube video by query string.
+        
+        FIX: The youtubesearchpython library passes invalid 'proxies' parameter 
+        to newer versions of aiohttp. We catch this and handle it gracefully.
+        """
         # Check cache first (10-minute TTL)
         cache_key = query
         current_time = asyncio.get_running_loop().time()
@@ -195,11 +201,28 @@ class YouTube:
         try:
             _search = VideosSearch(query, limit=1)
             results = await _search.next()
+        except TypeError as e:
+            # Handle 'proxies' parameter error in youtubesearchpython
+            if "proxies" in str(e):
+                logger.warning(f"⚠️ YouTube search library compatibility issue. Retrying with fallback...")
+                try:
+                    # Fallback: Try without the search object async context
+                    _search = VideosSearch(query, limit=1)
+                    results = _search.result()
+                    if not isinstance(results, dict) or "result" not in results:
+                        logger.warning(f"⚠️ YouTube search failed for '{query}': Invalid response format")
+                        return None
+                except Exception as fallback_e:
+                    logger.warning(f"⚠️ YouTube search fallback failed for '{query}': {fallback_e}")
+                    return None
+            else:
+                logger.warning(f"⚠️ YouTube search failed for '{query}': {e}")
+                return None
         except Exception as e:
             logger.warning(f"⚠️ YouTube search failed for '{query}': {e}")
             return None
 
-        if results and results["result"]:
+        if results and results.get("result"):
             data = results["result"][0]
             duration = data.get("duration")
             is_live = duration is None or duration == "LIVE"
@@ -238,111 +261,88 @@ class YouTube:
             if not plist or "videos" not in plist or not plist["videos"]:
                 return []
 
-            for data in plist["videos"][:limit]:
+            for video in plist["videos"][:limit]:
                 try:
-                    # Get thumbnail safely
-                    thumbnails = data.get("thumbnails", [])
-                    thumbnail_url = ""
-                    if thumbnails and len(thumbnails) > 0:
-                        thumbnail_url = thumbnails[-1].get(
-                            "url", "").split("?")[0]
-
-                    # Get link safely
-                    link = data.get("link", "")
-                    if "&list=" in link:
-                        link = link.split("&list=")[0]
+                    duration = video.get("duration")
+                    is_live = duration is None or duration == "LIVE"
 
                     track = Track(
-                        id=data.get("id", ""),
-                        channel_name=data.get("channel", {}).get("name", ""),
-                        duration=data.get("duration", "0:00"),
-                        duration_sec=utils.to_seconds(
-                            data.get("duration", "0:00")),
-                        title=(data.get("title", "Unknown")[:25]),
-                        thumbnail=thumbnail_url,
-                        url=link,
+                        id=video.get("id"),
+                        channel_name=video.get("channel", {}).get("name"),
+                        duration=duration if not is_live else "LIVE",
+                        duration_sec=0 if is_live else utils.to_seconds(duration),
+                        title=video.get("title")[:25],
+                        thumbnail=video.get("thumbnails", [{}])[
+                            -1
+                        ].get("url").split("?")[0],
+                        url=video.get("link"),
+                        view_count=video.get("viewCount", {}).get("short"),
                         user=user,
-                        view_count="",
+                        is_live=is_live,
                     )
                     tracks.append(track)
-                except Exception as e:
-                    # Skip individual track errors
+                except Exception as ex:
+                    logger.warning(f"Skipping video in playlist: {ex}")
                     continue
 
             return tracks
-        except KeyError as e:
-            # Handle YouTube API structure changes
-            raise Exception(
-                f"Failed to parse playlist. YouTube may have changed their structure.")
         except Exception as e:
-            # Re-raise other exceptions
-            raise
+            logger.error(f"Playlist fetch error: {e}")
+            return []
 
-    async def download(self, video_id: str, is_live: bool = False, video: bool = False) -> Optional[str]:
-        url = self.base + video_id
+    async def download(
+        self,
+        url: str,
+        is_live: bool = False,
+        video: bool = False,
+    ) -> Optional[str]:
+        """
+        Download a video/audio file from YouTube or stream URL.
+        
+        Args:
+            url: YouTube URL or direct stream URL
+            is_live: True if it's a live stream
+            video: True to download video, False for audio only
+            
+        Returns:
+            Path to the downloaded file, or None if failed
+        """
+        video_id = None
+        if url.startswith("http"):
+            # Extract video ID from YouTube URL
+            match = re.search(r"(?:youtube\.com/watch\?v=|youtu\.be/)([^&\n?#]+)", url)
+            if match:
+                video_id = match.group(1)
+        
+        if not video_id:
+            video_id = url  # Assume it's already a video ID
 
-        # For live streams, extract the direct stream URL using yt-dlp with cookies
-        if is_live:
-            cookie = self.get_cookies()
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
-                "cookiefile": cookie,
-                "format": "bestaudio/best",
-                "noplaylist": True,
-                "socket_timeout": 20,
-                "extractor_retries": 5,
-                "sleep_interval_requests": 1,
-                # Use android client to bypass YouTube bot detection on server IPs
-                "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
-            }
-
+        if self.is_network_stream(url):
+            # Handle m3u8 or direct streams
             def _extract_url():
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    try:
+                ydl_opts = {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "format": "best",
+                    "socket_timeout": 30,
+                }
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         info = ydl.extract_info(url, download=False)
-                        if not info:
-                            return None
-
-                        # For live: prefer manifest_url (m3u8) for best quality
-                        manifest = info.get("manifest_url")
-                        if manifest:
-                            return manifest
-
-                        direct = info.get("url")
-                        if direct:
-                            return direct
-
-                        # Pick best format: prefer video+audio, fallback to audio
-                        formats = info.get("formats", [])
-                        best = None
-                        for fmt in reversed(formats):
-                            if fmt.get("acodec") != "none" and fmt.get("url"):
-                                if fmt.get("vcodec") not in (None, "none"):
-                                    return fmt["url"]  # video+audio — best
-                                if not best:
-                                    best = fmt["url"]  # audio only fallback
-                        if best:
-                            return best
-
-                        return None
-                    except yt_dlp.utils.ExtractorError as ex:
-                        error_msg = str(ex)
-                        if "not available" in error_msg.lower():
-                            logger.error(
-                                "Video format not available or region-blocked.")
-                        else:
-                            logger.error(
-                                "Live stream URL extraction failed: %s", ex)
-                        return None
-                    except yt_dlp.utils.DownloadError as ex:
+                        if info:
+                            return info.get("url") or url
+                except yt_dlp.utils.ExtractorError as ex:
+                    if "not available" in str(ex).lower():
                         logger.error(
-                            "Unexpected error during live stream extraction: %s", ex)
+                            "❌ Stream not available: May be offline or region-blocked."
+                        )
+                    else:
+                        logger.error("❌ Stream extraction failed: %s", ex)
                         return None
-                    except Exception as ex:
-                        logger.error(
-                            "Unexpected error during live stream extraction: %s", ex)
-                        return None
+                except Exception as ex:
+                    logger.error(
+                        "Unexpected error during live stream extraction: %s", ex)
+                    return None
 
             try:
                 stream_url = await asyncio.wait_for(asyncio.to_thread(_extract_url), timeout=35)
