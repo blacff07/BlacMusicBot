@@ -429,7 +429,7 @@ class TgCall(PyTgCalls):
                             logger.debug(
                                 f"Connection error for {chat_id}, leaving and retrying... (attempt {attempt + 1}/{max_retries})")
                             try:
-                                await client.leave_call(chat_id, close=False)
+                                await client.leave_call(chat_id, close=True)
                                 await asyncio.sleep(retry_delay)
                             except Exception:
                                 pass
@@ -523,7 +523,14 @@ class TgCall(PyTgCalls):
             await self.stop(chat_id)
             if message:
                 try:
-                    await message.edit_text(_lang["error_vc_disabled"])
+                    await message.delete()
+                except Exception:
+                    pass
+                try:
+                    await app.send_message(
+                        chat_id=target_chat_for_messages,
+                        text=_lang["error_vc_disabled"],
+                    )
                 except Exception:
                     pass
         except errors.RPCError as e:
@@ -533,14 +540,28 @@ class TgCall(PyTgCalls):
                 await self.stop(chat_id)
                 if message:
                     try:
-                        await message.edit_text(_lang["error_vc_disabled"])
+                        await message.delete()
+                    except Exception:
+                        pass
+                    try:
+                        await app.send_message(
+                            chat_id=target_chat_for_messages,
+                            text=_lang["error_vc_disabled"],
+                        )
                     except Exception:
                         pass
             elif "GROUPCALL_INVALID" in error_str or "GROUPCALL" in error_str:
                 await self.stop(chat_id)
                 if message:
                     try:
-                        await message.edit_text(_lang["error_no_call"])
+                        await message.delete()
+                    except Exception:
+                        pass
+                    try:
+                        await app.send_message(
+                            chat_id=target_chat_for_messages,
+                            text=_lang["error_no_call"],
+                        )
                     except Exception:
                         pass
             else:
@@ -549,17 +570,31 @@ class TgCall(PyTgCalls):
         except exceptions.NoAudioSourceFound:
             if message:
                 try:
-                    await message.edit_text(_lang["error_no_audio"])
+                    await message.delete()
                 except Exception:
                     pass
+            try:
+                await app.send_message(
+                    chat_id=target_chat_for_messages,
+                    text=_lang.get("error_no_audio", "❌ ɴᴏ ᴀᴜᴅɪᴏ ꜱᴏᴜʀᴄᴇ ꜰᴏᴜɴᴅ."),
+                )
+            except Exception:
+                pass
             await self.play_next(chat_id)
         except (ConnectionNotFound, TelegramServerError):
             await self.stop(chat_id)
             if message:
                 try:
-                    await message.edit_text(_lang["error_tg_server"])
+                    await message.delete()
                 except Exception:
                     pass
+            try:
+                await app.send_message(
+                    chat_id=target_chat_for_messages,
+                    text=_lang.get("error_tg_server", "❌ ꜱᴇʀᴠᴇʀ ᴇʀʀᴏʀ. ᴘʟᴇᴀꜱᴇ ᴛʀʏ ᴀɢᴀɪɴ."),
+                )
+            except Exception:
+                pass
         except TimeoutError as e:
             error_msg = str(e)
             logger.warning(
@@ -581,9 +616,16 @@ class TgCall(PyTgCalls):
             await self.stop(chat_id)
             if message:
                 try:
-                    await message.edit_text(f"❌ Playback error: {str(e)[:100]}")
+                    await message.delete()
                 except Exception:
                     pass
+            try:
+                await app.send_message(
+                    chat_id=target_chat_for_messages,
+                    text=_lang["error_no_file"].format(config.SUPPORT_CHAT),
+                )
+            except Exception:
+                pass
 
     async def replay(self, chat_id: int) -> None:
         try:
@@ -677,11 +719,6 @@ class TgCall(PyTgCalls):
 
                 target_chat = message_chat_id if message_chat_id else chat_id
 
-                # Mark current track as skipped for completed-message UI
-                _cur_before_next = queue.get_current(chat_id)
-                if _cur_before_next and not getattr(_cur_before_next, '_skipped', None):
-                    pass  # will be set by skip command if applicable
-
                 loop_mode = await db.get_loop(chat_id)
 
                 if loop_mode == 1:
@@ -708,15 +745,15 @@ class TgCall(PyTgCalls):
                 _next_preview = queue.peek_next(chat_id) if hasattr(queue, 'peek_next') else None
                 _same_song = _next_preview and _current and _next_preview.id == _current.id
                 if _current and _current.file_path and not getattr(_current, 'is_live', False) and not _same_song:
+                    import os as _os
+                    _fp = _current.file_path
                     try:
-                        import os as _os
-                        if _os.path.exists(_current.file_path):
-                            _os.remove(_current.file_path)
+                        if _os.path.exists(_fp):
+                            _os.remove(_fp)
                     except Exception:
                         pass
-                    # Don't set file_path = None — next download creates a new file
-                    # Only clear if file was actually deleted
-                    if not _os.path.exists(_current.file_path):
+                    # Only clear path if file was actually deleted
+                    if not _os.path.exists(_fp):
                         _current.file_path = None
 
                 _prev_track = queue.get_current(chat_id)  # Save before get_next advances queue
@@ -728,7 +765,7 @@ class TgCall(PyTgCalls):
                         first_track = all_items[0]
                         _lang = await lang.get_lang(chat_id)
                         try:
-                            msg = await app.send_message(chat_id=target_chat, text="🔁 Looping queue...")
+                            msg = await app.send_message(chat_id=target_chat, text="<blockquote>🔁 <b>ʟᴏᴏᴘɪɴɢ ǫᴜᴇᴜᴇ...</b></blockquote>")
                             if not first_track.file_path:
                                 is_live = getattr(
                                     first_track, 'is_live', False)
@@ -812,22 +849,14 @@ class TgCall(PyTgCalls):
                     from BlacMusic.helpers._autoplay import trigger_autoplay, send_suggestions
 
                     autoplay_on = await db.get_autoplay(chat_id)
-                    queue_has_items = bool(queue.get_all(chat_id))
 
                     if autoplay_on:
-                        # Autoplay ON: silently add a related track and keep going
-                        asyncio.create_task(
-                            trigger_autoplay(chat_id, target_chat)
-                        )
-                        return  # autoplay takes over, don't stop
+                        asyncio.create_task(trigger_autoplay(chat_id, target_chat))
+                        return  # autoplay takes over
                     else:
-                        # Autoplay OFF and queue truly empty: send suggestion strip
-                        # Only send if no items were added while we were processing
-                        _fresh_check = bool(queue.get_all(chat_id))
-                        if not _fresh_check:
-                            asyncio.create_task(
-                                send_suggestions(chat_id, target_chat)
-                            )
+                        # Only send suggestions if queue is truly still empty
+                        if not queue.get_all(chat_id):
+                            asyncio.create_task(send_suggestions(chat_id, target_chat))
 
                     if config.AUTO_END:
                         _lang = await lang.get_lang(chat_id)
@@ -840,10 +869,26 @@ class TgCall(PyTgCalls):
                         except Exception as e:
                             logger.debug(
                                 f"Could not send auto_end message in {chat_id}: {e}")
-                    return await self.stop(chat_id)
+                    await self.stop(chat_id)
+                    return
 
                 _lang = await lang.get_lang(chat_id)
+
+                # Send status message FIRST so user sees feedback immediately
                 msg = None
+                try:
+                    msg = await app.send_message(chat_id=target_chat, text=_lang["play_next"])
+                except errors.FloodWait as fw:
+                    logger.warning(f"FloodWait in play_next for {chat_id}: skipping status ({fw.value}s)")
+                except errors.ChannelPrivate:
+                    logger.warning(f"Bot removed from {chat_id}, cleaning up")
+                    await self.leave_call(chat_id)
+                    await db.rm_chat(chat_id)
+                    return
+                except Exception as e:
+                    logger.error(f"Failed to send play_next message for {chat_id}: {e}")
+
+                # Download if needed
                 if not media.file_path:
                     is_live = getattr(media, 'is_live', False)
                     media.file_path = await yt.download(
@@ -852,14 +897,13 @@ class TgCall(PyTgCalls):
                         video=getattr(media, 'video', False),
                     )
                     if not media.file_path:
-                        await self.stop(chat_id)
+                        # Delete status message silently
                         if msg:
                             try:
-                                # Delete stuck "downloading" message — no error card, no buttons
                                 await msg.delete()
                             except Exception:
                                 pass
-                        # Try skipping to next song
+                        # Try next track
                         _fallback = queue.get_next(chat_id)
                         if _fallback:
                             if not _fallback.file_path:
@@ -872,45 +916,10 @@ class TgCall(PyTgCalls):
                                 await self.play_media(chat_id, None, _fallback, message_chat_id=message_chat_id)
                                 return
                         await self.stop(chat_id)
-                        for _vc in self.clients:
-                            try:
-                                await _vc.leave_call(chat_id)
-                                break
-                            except Exception:
-                                pass
                         return
 
-                try:
-                    msg = await app.send_message(chat_id=target_chat, text=_lang["play_next"])
-                except errors.FloodWait as fw:
-                    # Do not block playback on UI flood waits; continue without message.
-                    logger.warning(
-                        f"FloodWait in play_next for {chat_id}: skipping status message ({fw.value}s)")
-                    msg = None
-                except errors.ChannelPrivate:
-                    logger.warning(f"Bot removed from {chat_id}, cleaning up")
-                    await self.leave_call(chat_id)
-                    await db.rm_chat(chat_id)
-                    return
-                except Exception as e:
-                    logger.error(
-                        f"Failed to send play_next message for {chat_id}: {e}")
-                    msg = None
-
                 media.message_id = msg.id if msg else 0
-                if msg:
-                    await self.play_media(chat_id, msg, media, message_chat_id=message_chat_id)
-                else:
-                    logger.info(
-                        f"Playing next track for {chat_id} without message update")
-                    await self.play_media(chat_id, None, media, message_chat_id=message_chat_id)
-
-                try:
-                    asyncio.create_task(
-                        preload.start_preload(chat_id, count=2))
-                except Exception as e:
-                    logger.debug(
-                        f"Error starting preload after play_next for {chat_id}: {e}")
+                await self.play_media(chat_id, msg, media, message_chat_id=message_chat_id)
             except Exception as e:
                 logger.error(
                     f"Error in play_next for {chat_id}: {e}", exc_info=True)
@@ -924,13 +933,14 @@ class TgCall(PyTgCalls):
         return round(sum(pings) / len(pings), 2)
 
     async def decorators(self, client: PyTgCalls) -> None:
-        for client in self.clients:
-            @client.on_update()
-            async def update_handler(_, update: types.Update) -> None:
+        # Register on the specific client passed — NOT all clients
+        # Iterating self.clients here caused N^2 duplicate handler registrations
+        @client.on_update()
+        async def update_handler(_, update: types.Update) -> None:
                 if isinstance(update, types.StreamEnded):
                     if update.stream_type in (types.StreamEnded.Type.AUDIO, types.StreamEnded.Type.VIDEO):
                         chat_id = update.chat_id
-                        current_time = asyncio.get_event_loop().time()
+                        current_time = asyncio.get_running_loop().time()
 
                         if chat_id in self._stream_end_cache:
                             if current_time - self._stream_end_cache[chat_id] < 2.0:
