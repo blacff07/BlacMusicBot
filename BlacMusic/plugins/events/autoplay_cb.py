@@ -12,7 +12,8 @@ import asyncio
 
 from pyrogram import filters, types
 
-from BlacMusic import app, db, lang, logger, queue, tune, yt
+from BlacMusic import app, db, lang, logger, queue, yt
+# tune imported lazily inside handlers to avoid circular import
 from BlacMusic.helpers._dataclass import Track
 from BlacMusic.helpers._utilities import Utilities
 
@@ -113,7 +114,8 @@ async def autoplay_pick_cb(_, cq: types.CallbackQuery):
             queue.force_add(chat_id, track)
             try:
                 await db.add_call(chat_id)
-                await tune.play_media(chat_id, msg, track)
+                from BlacMusic import tune as _tune
+                await _tune.play_media(chat_id, msg, track)
             except Exception as e:
                 logger.debug(f"Autoplay pick: play_media failed: {e}")
 
