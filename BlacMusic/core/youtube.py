@@ -2,7 +2,7 @@
 # youtube.py - YouTube Download & Search Handler
 # ==============================================================================
 # This file handles all YouTube-related operations:
-# - Searching for videos/audio
+# - Searching for videos/audio using yt-dlp (fixes youtubesearchpython issues)
 # - Downloading YouTube content using yt-dlp
 # - Managing YouTube cookies for age-restricted content
 # - Caching search results for better performance
@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Optional, Union
 
 from pyrogram import enums, types
-from youtubesearchpython import Playlist, VideosSearch
 from BlacMusic import config, logger
 from BlacMusic.helpers import Track, utils
 
@@ -83,9 +82,10 @@ class YouTube:
 
     def get_cookies(self):
         if not self.checked:
-            for file in os.listdir("BlacMusic/cookies"):
-                if file.endswith(".txt"):
-                    self.cookies.append(file)
+            if os.path.exists("BlacMusic/cookies"):
+                for file in os.listdir("BlacMusic/cookies"):
+                    if file.endswith(".txt"):
+                        self.cookies.append(file)
             self.checked = True
         if not self.cookies:
             if not self.warned:
@@ -177,10 +177,10 @@ class YouTube:
 
     async def search(self, query: str, m_id: int) -> Track | None:
         """
-        Search for a YouTube video by query string.
+        Search for a YouTube video by query string using yt-dlp.
         
-        FIX: The youtubesearchpython library passes invalid 'proxies' parameter 
-        to newer versions of aiohttp. We catch this and handle it gracefully.
+        FIXED: Uses yt-dlp's built-in search instead of youtubesearchpython
+        to avoid the 'proxies' parameter error in newer aiohttp versions.
         """
         # Check cache first (10-minute TTL)
         cache_key = query
@@ -198,46 +198,59 @@ class YouTube:
                 fresh.video = False
                 return fresh
 
-        try:
-            _search = VideosSearch(query, limit=1)
-            results = await _search.next()
-        except TypeError as e:
-            # Handle 'proxies' parameter error in youtubesearchpython
-            if "proxies" in str(e):
-                logger.warning(f"⚠️ YouTube search library compatibility issue. Retrying with fallback...")
-                try:
-                    # Fallback: Try without the search object async context
-                    _search = VideosSearch(query, limit=1)
-                    results = _search.result()
-                    if not isinstance(results, dict) or "result" not in results:
-                        logger.warning(f"⚠️ YouTube search failed for '{query}': Invalid response format")
-                        return None
-                except Exception as fallback_e:
-                    logger.warning(f"⚠️ YouTube search fallback failed for '{query}': {fallback_e}")
-                    return None
-            else:
-                logger.warning(f"⚠️ YouTube search failed for '{query}': {e}")
+        def _search_yt(search_query: str) -> dict | None:
+            """Synchronous YouTube search using yt-dlp."""
+            try:
+                ydl_opts = {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "default_search": "ytsearch1",  # Search YouTube and get 1 result
+                    "extract_flat": True,  # Don't download, just extract metadata
+                    "socket_timeout": 15,
+                }
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(search_query, download=False)
+                    
+                    if info and "entries" in info and len(info["entries"]) > 0:
+                        video = info["entries"][0]
+                        return {
+                            "id": video.get("id"),
+                            "title": video.get("title"),
+                            "url": video.get("url"),
+                            "duration": video.get("duration"),
+                            "thumbnail": video.get("thumbnail"),
+                            "channel": video.get("uploader"),
+                            "view_count": video.get("view_count"),
+                        }
+            except Exception as e:
+                logger.warning(f"⚠️ yt-dlp search error for '{search_query}': {e}")
                 return None
-        except Exception as e:
-            logger.warning(f"⚠️ YouTube search failed for '{query}': {e}")
+            
             return None
 
-        if results and results.get("result"):
-            data = results["result"][0]
-            duration = data.get("duration")
-            is_live = duration is None or duration == "LIVE"
+        try:
+            # Run search in thread pool to avoid blocking
+            result = await asyncio.to_thread(_search_yt, query)
+            
+            if not result:
+                logger.warning(f"⚠️ No results found for '{query}'")
+                return None
+
+            # Parse duration
+            duration = result.get("duration")
+            is_live = duration is None or duration == 0
 
             track = Track(
-                id=data.get("id"),
-                channel_name=data.get("channel", {}).get("name"),
-                duration=duration if not is_live else "LIVE",
-                duration_sec=0 if is_live else utils.to_seconds(duration),
+                id=result.get("id"),
+                channel_name=result.get("channel"),
+                duration=utils.sec_to_str(duration) if duration else "LIVE",
+                duration_sec=duration if duration else 0,
                 message_id=m_id,
-                title=data.get("title")[:25],
-                thumbnail=data.get(
-                    "thumbnails", [{}])[-1].get("url").split("?")[0],
-                url=data.get("link"),
-                view_count=data.get("viewCount", {}).get("short"),
+                title=result.get("title", "Unknown")[:25],
+                thumbnail=result.get("thumbnail", ""),
+                url=result.get("url", ""),
+                view_count=str(result.get("view_count", 0)) if result.get("view_count") else "0",
                 is_live=is_live,
             )
 
@@ -249,34 +262,56 @@ class YouTube:
                                  key=lambda k: self.search_cache[k][1])
                 del self.search_cache[oldest_key]
 
+            logger.info(f"✅ Found: {track.title} by {track.channel_name}")
             return replace(track)
-        return None
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Search failed for '{query}': {e}")
+            return None
 
     async def playlist(self, limit: int, user: str, url: str) -> list[Track]:
+        """Fetch playlist videos using yt-dlp."""
+        def _fetch_playlist(playlist_url: str, video_limit: int) -> list[dict]:
+            try:
+                ydl_opts = {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "extract_flat": True,
+                    "playlistend": video_limit,
+                    "socket_timeout": 15,
+                }
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(playlist_url, download=False)
+                    
+                    if info and "entries" in info:
+                        return info["entries"]
+            except Exception as e:
+                logger.error(f"Playlist fetch error: {e}")
+            
+            return []
+
         try:
-            plist = await Playlist.get(url)
+            videos = await asyncio.to_thread(_fetch_playlist, url, limit)
             tracks = []
 
-            # Check if plist has videos
-            if not plist or "videos" not in plist or not plist["videos"]:
-                return []
-
-            for video in plist["videos"][:limit]:
+            for video in videos:
                 try:
+                    if not video or "id" not in video:
+                        continue
+                    
                     duration = video.get("duration")
-                    is_live = duration is None or duration == "LIVE"
+                    is_live = duration is None or duration == 0
 
                     track = Track(
                         id=video.get("id"),
-                        channel_name=video.get("channel", {}).get("name"),
-                        duration=duration if not is_live else "LIVE",
-                        duration_sec=0 if is_live else utils.to_seconds(duration),
-                        title=video.get("title")[:25],
-                        thumbnail=video.get("thumbnails", [{}])[
-                            -1
-                        ].get("url").split("?")[0],
-                        url=video.get("link"),
-                        view_count=video.get("viewCount", {}).get("short"),
+                        channel_name=video.get("uploader"),
+                        duration=utils.sec_to_str(duration) if duration else "LIVE",
+                        duration_sec=duration if duration else 0,
+                        title=video.get("title", "Unknown")[:25],
+                        thumbnail=video.get("thumbnail", ""),
+                        url=video.get("url", ""),
+                        view_count=str(video.get("view_count", 0)) if video.get("view_count") else "0",
                         user=user,
                         is_live=is_live,
                     )
@@ -287,7 +322,7 @@ class YouTube:
 
             return tracks
         except Exception as e:
-            logger.error(f"Playlist fetch error: {e}")
+            logger.error(f"Playlist processing error: {e}")
             return []
 
     async def download(
@@ -353,8 +388,6 @@ class YouTube:
             return stream_url
 
         # Download audio/video file
-        # Don't hardcode extension - let yt-dlp choose best available format
-        # Will use outtmpl pattern to get actual extension
         filename_pattern = f"downloads/{video_id}"
         
         # Check if any completed file for this video_id already exists
@@ -410,18 +443,13 @@ class YouTube:
                 "nocheckcertificate": True,
                 "continuedl": True,
                 "noprogress": True,
-                # **PERFORMANCE FIX**: Reduced to 4 fragments for maximum stability
-                # 4 fragments × 5 concurrent downloads = 20 total connections (prevents bandwidth saturation)
-                # Lower = more stable but slightly slower downloads (trade-off for zero lag)
                 "concurrent_fragment_downloads": 4,
-                "http_chunk_size": 524288,  # 512KB chunks (smaller = more stable streaming)
-                "socket_timeout": 30,  # Increased from 15s (prevents timeout on slow networks)
-                "retries": 2,  # Increased from 1 (better reliability)
-                "fragment_retries": 2,  # Increased from 1 (handle network hiccups)
+                "http_chunk_size": 524288,  # 512KB chunks
+                "socket_timeout": 30,
+                "retries": 2,
+                "fragment_retries": 2,
                 "extractor_retries": 5,
                 "sleep_interval_requests": 1,
-                # Use android client to bypass YouTube bot detection on server IPs.
-                # Android client does not require PO tokens and works from datacenter IPs.
                 "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
             }
 
@@ -495,7 +523,6 @@ class YouTube:
                         )
                         return recovered
                     if "416" in error_msg or "Requested range not satisfiable" in error_msg:
-                        # HTTP 416 - file partially downloaded, delete and retry won't help
                         logger.warning(f"⚠️ Range error for {video_id}, skipping")
                     else:
                         if "ffmpeg exited with code 255" not in str(ex):
