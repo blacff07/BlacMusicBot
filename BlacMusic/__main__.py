@@ -1,7 +1,3 @@
-# ==============================================================================
-# __main__.py - Main Entry Point for ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼
-# ==============================================================================
-
 import asyncio
 import importlib
 import sys
@@ -55,7 +51,6 @@ async def main():
         logger.info(f"👑 Loaded {len(app.sudoers)} sudo users.")
         logger.info("\n🎵 ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼ started successfully! Ready to play.\n")
 
-        # Edit restart message if bot was restarted via /restart
         import json as _json, os as _os
         _ctx_file = ".restart_ctx"
         if _os.path.exists(_ctx_file):
