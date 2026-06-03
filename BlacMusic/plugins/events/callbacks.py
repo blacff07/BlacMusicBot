@@ -5,7 +5,6 @@ from pyrogram import types
 
 from BlacMusic import app, db, lang, logger
 from BlacMusic.helpers import buttons
-from help_strings import HELP_STRINGS
 
 
 def callback_filter(pattern=None):
@@ -43,9 +42,10 @@ async def _start_callback(_, query: types.CallbackQuery):
 
 
 @callback_filter()
+@lang.language()
 async def _help_main_callback(_, query: types.CallbackQuery):
     if query.data == "help_main":
-        help_text = HELP_STRINGS["en"]["help_menu"]
+        help_text = query.lang["help_menu"]
         await query.edit_message_text(
             text=help_text,
             reply_markup=buttons.help_markup(query.lang),
@@ -53,9 +53,10 @@ async def _help_main_callback(_, query: types.CallbackQuery):
 
 
 @callback_filter()
+@lang.language()
 async def _help_playback_callback(_, query: types.CallbackQuery):
     if query.data == "help_playback":
-        help_text = HELP_STRINGS["en"]["help_playback"]
+        help_text = query.lang["help_playback"]
         await query.edit_message_text(
             text=help_text,
             reply_markup=buttons.help_markup(query.lang, back=True),
@@ -63,9 +64,10 @@ async def _help_playback_callback(_, query: types.CallbackQuery):
 
 
 @callback_filter()
+@lang.language()
 async def _help_controls_callback(_, query: types.CallbackQuery):
     if query.data == "help_controls":
-        help_text = HELP_STRINGS["en"]["help_controls"]
+        help_text = query.lang["help_controls"]
         await query.edit_message_text(
             text=help_text,
             reply_markup=buttons.help_markup(query.lang, back=True),
@@ -73,9 +75,10 @@ async def _help_controls_callback(_, query: types.CallbackQuery):
 
 
 @callback_filter()
+@lang.language()
 async def _help_admin_callback(_, query: types.CallbackQuery):
     if query.data == "help_admin":
-        help_text = HELP_STRINGS["en"]["help_admin"]
+        help_text = query.lang["help_admin"]
         await query.edit_message_text(
             text=help_text,
             reply_markup=buttons.help_markup(query.lang, back=True),
@@ -83,9 +86,10 @@ async def _help_admin_callback(_, query: types.CallbackQuery):
 
 
 @callback_filter()
+@lang.language()
 async def _help_blacklist_callback(_, query: types.CallbackQuery):
     if query.data == "help_blacklist":
-        help_text = HELP_STRINGS["en"]["help_blacklist"]
+        help_text = query.lang["help_blacklist"]
         await query.edit_message_text(
             text=help_text,
             reply_markup=buttons.help_markup(query.lang, back=True),
@@ -93,9 +97,10 @@ async def _help_blacklist_callback(_, query: types.CallbackQuery):
 
 
 @callback_filter()
+@lang.language()
 async def _help_filters_callback(_, query: types.CallbackQuery):
     if query.data == "help_filters":
-        help_text = HELP_STRINGS["en"]["help_filters"]
+        help_text = query.lang["help_filters"]
         await query.edit_message_text(
             text=help_text,
             reply_markup=buttons.help_markup(query.lang, back=True),
@@ -103,9 +108,10 @@ async def _help_filters_callback(_, query: types.CallbackQuery):
 
 
 @callback_filter()
+@lang.language()
 async def _help_tips_callback(_, query: types.CallbackQuery):
     if query.data == "help_tips":
-        help_text = HELP_STRINGS["en"]["help_tips"]
+        help_text = query.lang["help_tips"]
         await query.edit_message_text(
             text=help_text,
             reply_markup=buttons.help_markup(query.lang, back=True),
