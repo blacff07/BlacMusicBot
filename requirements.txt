@@ -1,10 +1,8 @@
 # ==============================================================================
-# requirements.txt - Python Dependencies
+# requirements.txt - Python Dependencies for BlacMusic
 # ==============================================================================
-# This file lists all Python packages required for ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼.
-
 # Installation: pip install -r requirements.txt
- 
+
 # Key Dependencies:
 # - aiohttp: Async HTTP client for API requests
 # - kurigram (Pyrogram): Telegram MTProto API framework
@@ -13,10 +11,9 @@
 # - pymongo: MongoDB database driver
 # - pytgcrypto: Telegram encryption layer
 # - py-tgcalls: Voice chat streaming library
-# - youtube-search-python: YouTube search without API
+# - py-yt-search: YouTube search without API (FIXED - replaced youtubesearchpython)
 # - python-dotenv: Load environment variables from .env
 # - yt-dlp: YouTube video/audio downloader
-# ==============================================================================
 
 aiohttp~=3.13.2
 kurigram~=2.2.17
@@ -25,7 +22,6 @@ psutil~=7.2.1
 pymongo~=4.15.5
 pytgcrypto~=1.2.11
 py-tgcalls~=2.2.8
-youtube-search-python~=1.6.6
+py-yt-search~=0.5.5
 python-dotenv~=1.2.1
 yt-dlp[default]>=2026.3.17
-
