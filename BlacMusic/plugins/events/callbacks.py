@@ -1,4 +1,3 @@
-```python
 import asyncio
 from functools import wraps
 
@@ -86,4 +85,3 @@ async def _settings_callback(_, query: types.CallbackQuery):
             text=query.message.text,
             reply_markup=query.message.reply_markup,
         )
-```
