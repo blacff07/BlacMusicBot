@@ -1,23 +1,12 @@
 import asyncio
 import random
-# ==============================================================================
-# start.py - Start Command and Basic Bot Interactions
-# ==============================================================================
-# This plugin handles:
-# - /start command (welcome message for new users)
-# - /help command (show help menu)
-# - /playmode or /settings command (group settings)
-# - New member detection (when bot joins a group)
-#
-# IMPROVED: message_effect_id now works by using app.send_message() directly
-# ==============================================================================
-
+import json
+from pathlib import Path
 from pyrogram import enums, errors, filters, types
 
-from BlacMusic import app, config, db, lang
+from BlacMusic import app, config, db, lang, logger
 from BlacMusic.helpers import buttons, utils
 
-# Telegram message effect IDs — visible to Premium users only, silently ignored otherwise
 _EFFECT_IDS = [
     5046509860389126442,
     5107584321108051014,
@@ -25,15 +14,41 @@ _EFFECT_IDS = [
     5159385139981059251,
 ]
 
-# Valid reaction emojis (Telegram reaction tray)
 VALID_REACTIONS = ["👀", "💔", "⚡", "❤️", "🎉"]
+
+
+async def handle_restart_message():
+    """Edit restart message after bot boots up"""
+    restart_ctx_file = Path(".restart_ctx")
+    
+    if restart_ctx_file.exists():
+        try:
+            with open(restart_ctx_file, "r") as f:
+                ctx = json.load(f)
+            
+            chat_id = ctx.get("chat_id")
+            message_id = ctx.get("message_id")
+            
+            if chat_id and message_id:
+                await app.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text="✅ <b>Bot Restarted Successfully!</b>\n\n🚀 Ready to play music."
+                )
+            
+            restart_ctx_file.unlink()
+        except Exception as e:
+            logger.warning(f"Error handling restart message: {e}")
+            try:
+                restart_ctx_file.unlink()
+            except:
+                pass
 
 
 @app.on_message(filters.command(["help"]) & ~app.bl_users)
 @lang.language()
 async def _help(_, m: types.Message):
     """Handle /help command in private chats - shows help menu with image."""
-    # Auto-delete command message
     try:
         await m.delete()
     except Exception:
@@ -60,39 +75,25 @@ async def _help(_, m: types.Message):
 @app.on_message(filters.command(["start"]))
 @lang.language()
 async def start(_, message: types.Message):
-    """
-    Handle /start command - welcome message for users.
-
-    - In private chat: Shows welcome message with inline buttons
-    - In group chat: Shows short welcome message
-    - Adds new users to database
-    - Sends log to logger group for new users
-    """
-    # Auto-delete command message in group chats
+    """Handle /start command - welcome message for users."""
     if message.chat.type != enums.ChatType.PRIVATE:
         try:
             await message.delete()
         except Exception:
             pass
 
-    # Skip if message from channel or anonymous admin
     if not message.from_user:
         return
 
-    # Check if user is blacklisted
     if message.from_user.id in app.bl_users and message.from_user.id not in db.notified:
         return await message.reply_text(message.lang["bl_user_notify"])
 
-    # If /start help, show help menu
     if len(message.command) > 1 and message.command[1] == "help":
         return await _help(_, message)
 
-    # Determine if chat is private or group
     private = message.chat.type == enums.ChatType.PRIVATE
 
-    # Choose appropriate welcome message
     if private:
-        # Hyperlink sender's name to their Telegram profile
         _user_link = (
             "<a href='tg://user?id=" + str(message.from_user.id) + "'>"
             + message.from_user.first_name + "</a>"
@@ -121,12 +122,9 @@ async def start(_, message: types.Message):
     key = buttons.start_key(message.lang, private)
     _effect = random.choice(_EFFECT_IDS) if private else None
     
-    # IMPROVED: Use send_message with message_effect_id for better support
-    # message_effect_id only works in private chats and for Premium users
     if config.START_IMG:
         try:
             if private and _effect:
-                # Direct API method for proper message_effect_id support
                 try:
                     await app.send_photo(
                         chat_id=message.chat.id,
@@ -137,7 +135,6 @@ async def start(_, message: types.Message):
                         message_effect_id=_effect,
                     )
                 except TypeError:
-                    # Fallback if this version doesn't support message_effect_id parameter
                     await message.reply_photo(
                         photo=config.START_IMG,
                         caption=_text,
@@ -145,7 +142,6 @@ async def start(_, message: types.Message):
                         quote=not private,
                     )
             else:
-                # Group chat or no effect ID — use standard method
                 await message.reply_photo(
                     photo=config.START_IMG,
                     caption=_text,
@@ -153,7 +149,6 @@ async def start(_, message: types.Message):
                     quote=not private,
                 )
         except Exception:
-            # Fallback to text message if photo fails
             try:
                 if private and _effect:
                     await app.send_message(
@@ -170,14 +165,12 @@ async def start(_, message: types.Message):
                         quote=not private,
                     )
             except Exception:
-                # Last resort fallback
                 await message.reply_text(
                     text=_text,
                     reply_markup=key,
                     quote=not private,
                 )
     else:
-        # No image configured — send text message
         try:
             if private and _effect:
                 await app.send_message(
@@ -194,7 +187,6 @@ async def start(_, message: types.Message):
                     quote=not private,
                 )
         except TypeError:
-            # Fallback if message_effect_id not supported
             await message.reply_text(
                 text=_text,
                 reply_markup=key,
@@ -208,9 +200,7 @@ async def start(_, message: types.Message):
                 quote=not private,
             )
 
-    # For private chats — send random reaction, log, and add user to database
     if private:
-        # Send a valid reaction from the list
         try:
             reaction_emoji = random.choice(VALID_REACTIONS)
             await app.send_reaction(
@@ -223,25 +213,15 @@ async def start(_, message: types.Message):
             pass
 
         if await db.is_user(message.from_user.id):
-            return  # User already exists, no need to add
-        # Log new user to logger group
+            return
         await utils.send_log(message)
-        # Add user to database
         return await db.add_user(message.from_user.id)
 
 
 @app.on_message(filters.command(["playmode", "settings"]) & filters.group & ~app.bl_users)
 @lang.language()
 async def settings(_, message: types.Message):
-    """
-    Handle /playmode or /settings command - show group settings.
-
-    Displays:
-    - Play mode (everyone or admin only)
-    - Current language
-    - Options to change settings
-    """
-    # Auto-delete command message
+    """Handle /playmode or /settings command - show group settings."""
     try:
         await message.delete()
     except Exception:
@@ -262,20 +242,12 @@ async def settings(_, message: types.Message):
 @app.on_message(filters.new_chat_members, group=7)
 @lang.language()
 async def _new_member(_, message: types.Message):
-    """
-    Handle new member events - detect when bot is added to groups.
-
-    - Leaves non-supergroup chats
-    - Adds new groups to database
-    """
-    # Only work in supergroups (not basic groups)
+    """Handle new member events - detect when bot is added to groups."""
     if message.chat.type != enums.ChatType.SUPERGROUP:
         return await message.chat.leave()
 
-    # Check each new member
     for member in message.new_chat_members:
-        if member.id == app.id:  # Bot itself was added
+        if member.id == app.id:
             if await db.is_chat(message.chat.id):
-                return  # Chat already in database
-            # Add chat to database (log is sent from new_chat.py with photo)
+                return
             await db.add_chat(message.chat.id)
