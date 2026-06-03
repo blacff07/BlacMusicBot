@@ -2,7 +2,7 @@
 # youtube.py - YouTube Download & Search Handler
 # ==============================================================================
 # This file handles all YouTube-related operations:
-# - Searching for videos/audio using yt-dlp (fixes youtubesearchpython issues)
+# - Searching for videos/audio using py-yt-search (proper library)
 # - Downloading YouTube content using yt-dlp
 # - Managing YouTube cookies for age-restricted content
 # - Caching search results for better performance
@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from pyrogram import enums, types
+from py_yt import Playlist, VideosSearch
 from BlacMusic import config, logger
 from BlacMusic.helpers import Track, utils
 
@@ -114,7 +115,6 @@ class YouTube:
                             fw.write(content)
                         if os.path.exists(path) and os.path.getsize(path) > 0:
                             saved_count += 1
-                            # Add the new cookie file to the list immediately
                             cookie_filename = os.path.basename(path)
                             if cookie_filename not in self.cookies:
                                 self.cookies.append(cookie_filename)
@@ -122,7 +122,6 @@ class YouTube:
             except Exception as e:
                 logger.error(f"❌ Cookie download error from {url}: {e}")
         
-        # Force refresh of cookie list after download
         self.checked = True
         
         if saved_count > 0:
@@ -177,10 +176,8 @@ class YouTube:
 
     async def search(self, query: str, m_id: int) -> Track | None:
         """
-        Search for a YouTube video by query string using yt-dlp.
-        
-        FIXED: Uses yt-dlp's built-in search instead of youtubesearchpython
-        to avoid the 'proxies' parameter error in newer aiohttp versions.
+        Search for a YouTube video by query string using py-yt-search.
+        FIXED: Uses proper py-yt-search library instead of youtubesearchpython.
         """
         # Check cache first (10-minute TTL)
         cache_key = query
@@ -198,59 +195,29 @@ class YouTube:
                 fresh.video = False
                 return fresh
 
-        def _search_yt(search_query: str) -> dict | None:
-            """Synchronous YouTube search using yt-dlp."""
-            try:
-                ydl_opts = {
-                    "quiet": True,
-                    "no_warnings": True,
-                    "default_search": "ytsearch1",  # Search YouTube and get 1 result
-                    "extract_flat": True,  # Don't download, just extract metadata
-                    "socket_timeout": 15,
-                }
-                
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(search_query, download=False)
-                    
-                    if info and "entries" in info and len(info["entries"]) > 0:
-                        video = info["entries"][0]
-                        return {
-                            "id": video.get("id"),
-                            "title": video.get("title"),
-                            "url": video.get("url"),
-                            "duration": video.get("duration"),
-                            "thumbnail": video.get("thumbnail"),
-                            "channel": video.get("uploader"),
-                            "view_count": video.get("view_count"),
-                        }
-            except Exception as e:
-                logger.warning(f"⚠️ yt-dlp search error for '{search_query}': {e}")
-                return None
-            
+        try:
+            _search = VideosSearch(query, limit=1)
+            results = await _search.next()
+        except Exception as e:
+            logger.warning(f"⚠️ YouTube search failed for '{query}': {e}")
             return None
 
-        try:
-            # Run search in thread pool to avoid blocking
-            result = await asyncio.to_thread(_search_yt, query)
-            
-            if not result:
-                logger.warning(f"⚠️ No results found for '{query}'")
-                return None
-
-            # Parse duration
-            duration = result.get("duration")
-            is_live = duration is None or duration == 0
+        if results and results.get("result"):
+            data = results["result"][0]
+            duration = data.get("duration")
+            is_live = duration is None or duration == "LIVE"
 
             track = Track(
-                id=result.get("id"),
-                channel_name=result.get("channel"),
-                duration=utils.sec_to_str(duration) if duration else "LIVE",
-                duration_sec=duration if duration else 0,
+                id=data.get("id"),
+                channel_name=data.get("channel", {}).get("name"),
+                duration=duration if not is_live else "LIVE",
+                duration_sec=0 if is_live else utils.to_seconds(duration),
                 message_id=m_id,
-                title=result.get("title", "Unknown")[:25],
-                thumbnail=result.get("thumbnail", ""),
-                url=result.get("url", ""),
-                view_count=str(result.get("view_count", 0)) if result.get("view_count") else "0",
+                title=data.get("title")[:25],
+                thumbnail=data.get(
+                    "thumbnails", [{}])[-1].get("url").split("?")[0],
+                url=data.get("link"),
+                view_count=data.get("viewCount", {}).get("short"),
                 is_live=is_live,
             )
 
@@ -262,56 +229,32 @@ class YouTube:
                                  key=lambda k: self.search_cache[k][1])
                 del self.search_cache[oldest_key]
 
-            logger.info(f"✅ Found: {track.title} by {track.channel_name}")
             return replace(track)
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Search failed for '{query}': {e}")
-            return None
+        return None
 
     async def playlist(self, limit: int, user: str, url: str) -> list[Track]:
-        """Fetch playlist videos using yt-dlp."""
-        def _fetch_playlist(playlist_url: str, video_limit: int) -> list[dict]:
-            try:
-                ydl_opts = {
-                    "quiet": True,
-                    "no_warnings": True,
-                    "extract_flat": True,
-                    "playlistend": video_limit,
-                    "socket_timeout": 15,
-                }
-                
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(playlist_url, download=False)
-                    
-                    if info and "entries" in info:
-                        return info["entries"]
-            except Exception as e:
-                logger.error(f"Playlist fetch error: {e}")
-            
-            return []
-
+        """Fetch playlist videos using py-yt-search."""
         try:
-            videos = await asyncio.to_thread(_fetch_playlist, url, limit)
+            plist = await Playlist.get(url)
             tracks = []
 
-            for video in videos:
+            if not plist or "videos" not in plist or not plist["videos"]:
+                return []
+
+            for video in plist["videos"][:limit]:
                 try:
-                    if not video or "id" not in video:
-                        continue
-                    
                     duration = video.get("duration")
-                    is_live = duration is None or duration == 0
+                    is_live = duration is None or duration == "LIVE"
 
                     track = Track(
                         id=video.get("id"),
-                        channel_name=video.get("uploader"),
-                        duration=utils.sec_to_str(duration) if duration else "LIVE",
-                        duration_sec=duration if duration else 0,
-                        title=video.get("title", "Unknown")[:25],
-                        thumbnail=video.get("thumbnail", ""),
-                        url=video.get("url", ""),
-                        view_count=str(video.get("view_count", 0)) if video.get("view_count") else "0",
+                        channel_name=video.get("channel", {}).get("name"),
+                        duration=duration if not is_live else "LIVE",
+                        duration_sec=0 if is_live else utils.to_seconds(duration),
+                        title=video.get("title")[:25],
+                        thumbnail=video.get("thumbnails", [{}])[-1].get("url").split("?")[0],
+                        url=video.get("link"),
+                        view_count=video.get("viewCount", {}).get("short"),
                         user=user,
                         is_live=is_live,
                     )
@@ -322,7 +265,7 @@ class YouTube:
 
             return tracks
         except Exception as e:
-            logger.error(f"Playlist processing error: {e}")
+            logger.error(f"Playlist fetch error: {e}")
             return []
 
     async def download(
@@ -331,29 +274,17 @@ class YouTube:
         is_live: bool = False,
         video: bool = False,
     ) -> Optional[str]:
-        """
-        Download a video/audio file from YouTube or stream URL.
-        
-        Args:
-            url: YouTube URL or direct stream URL
-            is_live: True if it's a live stream
-            video: True to download video, False for audio only
-            
-        Returns:
-            Path to the downloaded file, or None if failed
-        """
+        """Download a video/audio file from YouTube or stream URL."""
         video_id = None
         if url.startswith("http"):
-            # Extract video ID from YouTube URL
             match = re.search(r"(?:youtube\.com/watch\?v=|youtu\.be/)([^&\n?#]+)", url)
             if match:
                 video_id = match.group(1)
         
         if not video_id:
-            video_id = url  # Assume it's already a video ID
+            video_id = url
 
         if self.is_network_stream(url):
-            # Handle m3u8 or direct streams
             def _extract_url():
                 ydl_opts = {
                     "quiet": True,
@@ -368,15 +299,12 @@ class YouTube:
                             return info.get("url") or url
                 except yt_dlp.utils.ExtractorError as ex:
                     if "not available" in str(ex).lower():
-                        logger.error(
-                            "❌ Stream not available: May be offline or region-blocked."
-                        )
+                        logger.error("❌ Stream not available: May be offline or region-blocked.")
                     else:
                         logger.error("❌ Stream extraction failed: %s", ex)
                         return None
                 except Exception as ex:
-                    logger.error(
-                        "Unexpected error during live stream extraction: %s", ex)
+                    logger.error("Unexpected error during live stream extraction: %s", ex)
                     return None
 
             try:
@@ -387,10 +315,8 @@ class YouTube:
 
             return stream_url
 
-        # Download audio/video file
         filename_pattern = f"downloads/{video_id}"
         
-        # Check if any completed file for this video_id already exists
         existing_files = [
             f for f in glob.glob(f"{filename_pattern}.*")
             if not f.endswith('.part')
@@ -410,8 +336,6 @@ class YouTube:
             if audio_candidates:
                 return audio_candidates[0]
 
-            # VPS caches are often dominated by mp4 due to prior /vplay usage.
-            # Reuse those files for /play (audio-only mode) to avoid redundant redownloads.
             container_fallbacks = [
                 f for f in existing_files
                 if Path(f).suffix.lower() in {".mp4", ".mkv", ".mov"}
@@ -419,7 +343,6 @@ class YouTube:
             if container_fallbacks:
                 return container_fallbacks[0]
         
-        # Ensure downloads directory exists with write permissions
         downloads_dir = Path("downloads")
         if not downloads_dir.exists():
             try:
@@ -429,8 +352,6 @@ class YouTube:
                 logger.error(f"❌ Cannot create downloads directory: {e}")
                 return None
 
-        # **PERFORMANCE FIX**: Use semaphore to limit concurrent downloads
-        # Prevents bandwidth saturation when 15-20 groups download simultaneously
         async with self._download_semaphore:
             cookie = self.get_cookies()
             base_opts = {
@@ -444,7 +365,7 @@ class YouTube:
                 "continuedl": True,
                 "noprogress": True,
                 "concurrent_fragment_downloads": 4,
-                "http_chunk_size": 524288,  # 512KB chunks
+                "http_chunk_size": 524288,
                 "socket_timeout": 30,
                 "retries": 2,
                 "fragment_retries": 2,
@@ -454,7 +375,6 @@ class YouTube:
             }
 
             if video:
-                # Video mode: download best video/audio combo up to configured height
                 height_filter = ""
                 if self._max_video_height and self._max_video_height > 0:
                     height_filter = f"[height<={self._max_video_height}]"
@@ -475,7 +395,6 @@ class YouTube:
                     ],
                 }
             else:
-                # Audio mode: favor m4a/opus for best compatibility
                 ydl_opts = {
                     **base_opts,
                     "format": "bestaudio[ext=m4a]/bestaudio[acodec=opus]/bestaudio/best",
@@ -491,7 +410,6 @@ class YouTube:
                 ydl_instance = None
                 try:
                     ydl_instance = yt_dlp.YoutubeDL(ydl_runtime_opts)
-                    # Extract info to get actual extension downloaded
                     info = ydl_instance.extract_info(url, download=True)
                     if not info:
                         logger.error(f"❌ Failed to extract info for {video_id}")
@@ -506,11 +424,9 @@ class YouTube:
                 except yt_dlp.utils.ExtractorError as ex:
                     error_msg = str(ex)
                     if "not available" in error_msg.lower():
-                        logger.error(
-                            "❌ Video not available: May be region-blocked or private.")
+                        logger.error("❌ Video not available: May be region-blocked or private.")
                     elif "age" in error_msg.lower():
-                        logger.error(
-                            "❌ Age-restricted video: Cookies required.")
+                        logger.error("❌ Age-restricted video: Cookies required.")
                     else:
                         logger.error("❌ YouTube extraction failed: %s", ex)
                     return None
@@ -518,9 +434,7 @@ class YouTube:
                     error_msg = str(ex)
                     recovered = self._locate_download_file(video_id, video=video)
                     if "unable to rename file" in error_msg.lower() and recovered:
-                        logger.warning(
-                            f"⚠️ Renaming failed for {video_id}, using recovered file {Path(recovered).name}"
-                        )
+                        logger.warning(f"⚠️ Using recovered file for {video_id}")
                         return recovered
                     if "416" in error_msg or "Requested range not satisfiable" in error_msg:
                         logger.warning(f"⚠️ Range error for {video_id}, skipping")
@@ -528,21 +442,17 @@ class YouTube:
                         if "ffmpeg exited with code 255" not in str(ex):
                             logger.warning(f"⚠️ Download error for {video_id}: {ex}")
                         if recovered:
-                            logger.warning(
-                                f"⚠️ Using recovered file for {video_id} despite download error"
-                            )
+                            logger.warning(f"⚠️ Using recovered file for {video_id} despite error")
                             return recovered
                     return None
                 except Exception as ex:
                     logger.warning(f"⚠️ Unexpected download error for {video_id}: {ex}")
                     return None
                 finally:
-                    # CRITICAL: Explicitly close yt-dlp to release file handles
                     if ydl_instance:
                         try:
                             ydl_instance.close()
                         except Exception:
                             pass
 
-            # Single attempt with the initially selected cookie.
             return await asyncio.to_thread(_download, ydl_opts_cookie)
