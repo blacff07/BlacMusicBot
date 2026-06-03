@@ -194,6 +194,14 @@ async def _update(_, m: types.Message):
         for directory in ["cache"]:
             shutil.rmtree(directory, ignore_errors=True)
         
+        # Save restart context so we can edit message after boot
+        import json as _json
+        try:
+            with open(".restart_ctx", "w") as _f:
+                _json.dump({"chat_id": sent.chat.id, "message_id": sent.id}, _f)
+        except Exception:
+            pass
+        
         asyncio.create_task(stop())
         await asyncio.sleep(2)
         
