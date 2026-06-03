@@ -1,4 +1,3 @@
-```bash
 #!/bin/bash
 
 set -e
@@ -101,4 +100,3 @@ echo ""
 echo -e "${BLUE}To start the bot, simply run:${NC}"
 echo -e "${YELLOW}python -m BlacMusic${NC}"
 echo ""
-```
