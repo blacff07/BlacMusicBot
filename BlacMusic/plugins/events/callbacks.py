@@ -1,150 +1,247 @@
+import re
 import asyncio
 from functools import wraps
 
-from pyrogram import types
+from pyrogram import filters, types
+from pyrogram.errors import FloodWait, QueryIdInvalid
 
-from BlacMusic import app, db, lang, logger
-from BlacMusic.helpers import buttons
+from BlacMusic import tune, app, config, db, lang, logger, queue, tg, yt
+from BlacMusic.helpers import admin_check, buttons, can_manage_vc
 
 
-def callback_filter(pattern=None):
-    async def decorator(func):
-        @wraps(func)
-        async def wrapper(client, query: types.CallbackQuery):
+def safe_callback(func):
+    @wraps(func)
+    async def wrapper(client, query: types.CallbackQuery):
+        try:
+            return await func(client, query)
+        except QueryIdInvalid:
+            return
+        except Exception as e:
+            logger.error(f"Error in callback {func.__name__}: {e}", exc_info=True)
             try:
-                return await func(client, query)
-            except Exception as e:
-                await query.answer(f"Error: {str(e)[:100]}", show_alert=False)
-                logger.error(f"Error in callback {func.__name__}: {e}", exc_info=True)
-        
-        if pattern:
-            app.on_callback_query(filters=pattern)(wrapper)
-        else:
-            app.on_callback_query()(wrapper)
-        return wrapper
-    return decorator
+                await query.answer("❌ An error occurred. Please try again.", show_alert=True)
+            except Exception:
+                pass
+    return wrapper
 
 
-@callback_filter()
+@app.on_callback_query(filters.regex("^start$") & ~app.bl_users)
 @lang.language()
+@safe_callback
 async def _start_callback(_, query: types.CallbackQuery):
-    if query.data == "start_back" or query.data == "start":
-        _user_link = (
-            "<a href='tg://user?id=" + str(query.from_user.id) + "'>"
-            + query.from_user.first_name + "</a>"
+    await query.answer()
+    
+    _text = query.lang["start_pm"].format(query.from_user.first_name, app.name)
+    key = buttons.start_key(query.lang, True)
+    
+    try:
+        await query.edit_message_caption(
+            caption=_text,
+            reply_markup=key,
         )
-        _text = query.lang["start_pm"].format(_user_link, app.id, app.name)
-        
-        await query.edit_message_text(
-            text=_text,
-            reply_markup=buttons.start_key(query.lang, True),
-        )
+    except Exception:
+        try:
+            await query.edit_message_text(
+                text=_text,
+                reply_markup=key,
+            )
+        except Exception:
+            pass
 
 
-@callback_filter()
+@app.on_callback_query(filters.regex("^help$") & ~app.bl_users)
 @lang.language()
-async def _help_main_callback(_, query: types.CallbackQuery):
-    if query.data == "help_main":
-        help_text = query.lang["help_menu"]
-        await query.edit_message_text(
-            text=help_text,
+@safe_callback
+async def _help_main(_, query: types.CallbackQuery):
+    await query.answer()
+    
+    try:
+        await query.edit_message_caption(
+            caption=query.lang["help_menu"],
             reply_markup=buttons.help_markup(query.lang),
         )
+    except Exception:
+        try:
+            await query.edit_message_text(
+                text=query.lang["help_menu"],
+                reply_markup=buttons.help_markup(query.lang),
+            )
+        except Exception:
+            pass
 
 
-@callback_filter()
+@app.on_callback_query(filters.regex("^help_") & ~app.bl_users)
 @lang.language()
-async def _help_playback_callback(_, query: types.CallbackQuery):
-    if query.data == "help_playback":
-        help_text = query.lang["help_playback"]
-        await query.edit_message_text(
-            text=help_text,
-            reply_markup=buttons.help_markup(query.lang, back=True),
-        )
-
-
-@callback_filter()
-@lang.language()
-async def _help_controls_callback(_, query: types.CallbackQuery):
-    if query.data == "help_controls":
-        help_text = query.lang["help_controls"]
-        await query.edit_message_text(
-            text=help_text,
-            reply_markup=buttons.help_markup(query.lang, back=True),
-        )
-
-
-@callback_filter()
-@lang.language()
-async def _help_admin_callback(_, query: types.CallbackQuery):
-    if query.data == "help_admin":
-        help_text = query.lang["help_admin"]
-        await query.edit_message_text(
-            text=help_text,
-            reply_markup=buttons.help_markup(query.lang, back=True),
-        )
-
-
-@callback_filter()
-@lang.language()
-async def _help_blacklist_callback(_, query: types.CallbackQuery):
-    if query.data == "help_blacklist":
-        help_text = query.lang["help_blacklist"]
-        await query.edit_message_text(
-            text=help_text,
-            reply_markup=buttons.help_markup(query.lang, back=True),
-        )
-
-
-@callback_filter()
-@lang.language()
-async def _help_filters_callback(_, query: types.CallbackQuery):
-    if query.data == "help_filters":
-        help_text = query.lang["help_filters"]
-        await query.edit_message_text(
-            text=help_text,
-            reply_markup=buttons.help_markup(query.lang, back=True),
-        )
-
-
-@callback_filter()
-@lang.language()
-async def _help_tips_callback(_, query: types.CallbackQuery):
-    if query.data == "help_tips":
-        help_text = query.lang["help_tips"]
-        await query.edit_message_text(
-            text=help_text,
-            reply_markup=buttons.help_markup(query.lang, back=True),
-        )
-
-
-@callback_filter()
-@lang.language()
-async def _settings_callback(_, query: types.CallbackQuery):
-    if query.data.startswith("toggle_playmode"):
-        parts = query.data.split()
-        if len(parts) < 2:
-            await query.answer("Invalid callback data", show_alert=False)
-            return
-        
-        chat_id = int(parts[1])
-        admin_only = await db.get_play_mode(chat_id)
-        new_mode = not admin_only
-        await db.set_play_mode(chat_id, new_mode)
-        
-        mode_text = "Admin Only" if new_mode else "Everyone"
-        await query.answer(f"Play mode changed to: {mode_text}", show_alert=True)
+@safe_callback
+async def _help_categories(_, query: types.CallbackQuery):
+    await query.answer()
     
-    if query.data == "settings":
-        chat_id = query.message.chat.id if query.message.chat.type != "private" else query.from_user.id
-        admin_only = await db.get_play_mode(chat_id) if query.message.chat.type != "private" else False
-        
-        settings_text = (
-            "⚙️ <b>Group Settings</b>\n\n"
-            f"Play Mode: {'Admin Only' if admin_only else 'Everyone'}\n"
+    category = query.data.replace("help_", "")
+    
+    help_texts = {
+        "playback": query.lang.get("help_playback", "Coming soon..."),
+        "controls": query.lang.get("help_controls", "Coming soon..."),
+        "admin": query.lang.get("help_admins", "Coming soon..."),
+        "auth": query.lang.get("help_auth", "Coming soon..."),
+        "blacklist": query.lang.get("help_blacklist", query.lang.get("help_blchat", "Coming soon...")),
+        "filters": query.lang.get("help_filters", "Coming soon..."),
+        "tips": query.lang.get("help_tips", "Coming soon..."),
+        "admins": query.lang.get("help_admins", "Coming soon..."),
+        "bluser": query.lang.get("help_bluser", "Coming soon..."),
+        "blchat": query.lang.get("help_blchat", "Coming soon..."),
+        "gban": query.lang.get("help_gban", "Coming soon..."),
+        "loop": query.lang.get("help_loop", "Coming soon..."),
+        "play": query.lang.get("help_play", "Coming soon..."),
+        "queue": query.lang.get("help_queue", "Coming soon..."),
+        "shuffle": query.lang.get("help_shuffle", "Coming soon..."),
+        "seek": query.lang.get("help_seek", "Coming soon..."),
+    }
+    
+    text = help_texts.get(category, "Unknown category")
+    
+    try:
+        await query.edit_message_caption(
+            caption=text,
+            reply_markup=buttons.help_markup(query.lang, back=True),
         )
-        
-        await query.edit_message_text(
-            text=settings_text,
+    except Exception:
+        try:
+            await query.edit_message_text(
+                text=text,
+                reply_markup=buttons.help_markup(query.lang, back=True),
+            )
+        except Exception:
+            pass
+
+
+@app.on_callback_query(filters.regex("cancel_dl") & ~app.bl_users)
+@lang.language()
+@safe_callback
+async def cancel_dl(_, query: types.CallbackQuery):
+    await query.answer()
+    await tg.cancel(query)
+
+
+@app.on_callback_query(filters.regex("controls") & ~app.bl_users)
+@lang.language()
+@safe_callback
+async def _controls(_, query: types.CallbackQuery):
+    args = query.data.split()
+    chat_id = int(args[1])
+    control = args[2] if len(args) > 2 else None
+
+    if not control:
+        await query.answer()
+        return
+
+    if control == "close":
+        await query.answer()
+        return await query.message.delete()
+
+    if control == "stop":
+        await query.answer()
+        if not await can_manage_vc(chat_id, query.from_user.id, query.message):
+            return
+        return await tune.stop_playing(chat_id)
+
+    if control == "pause":
+        await query.answer()
+        if not await can_manage_vc(chat_id, query.from_user.id, query.message):
+            return
+        return await tune.pause(chat_id)
+
+    if control == "resume":
+        await query.answer()
+        if not await can_manage_vc(chat_id, query.from_user.id, query.message):
+            return
+        return await tune.resume(chat_id)
+
+    if control == "skip":
+        await query.answer()
+        if not await can_manage_vc(chat_id, query.from_user.id, query.message):
+            return
+        return await tune.skip(chat_id)
+
+    if control == "replay":
+        await query.answer()
+        if not await can_manage_vc(chat_id, query.from_user.id, query.message):
+            return
+        return await tune.replay(chat_id)
+
+    if control in ["seek_back_10", "seek_back_30", "seek_forward_10", "seek_forward_30"]:
+        await query.answer()
+        if not await can_manage_vc(chat_id, query.from_user.id, query.message):
+            return
+
+        if control == "seek_back_10":
+            return await tune.seek(chat_id, -10)
+        elif control == "seek_back_30":
+            return await tune.seek(chat_id, -30)
+        elif control == "seek_forward_10":
+            return await tune.seek(chat_id, 10)
+        elif control == "seek_forward_30":
+            return await tune.seek(chat_id, 30)
+
+    await query.answer()
+
+
+@app.on_callback_query(filters.regex("^settings$") & ~app.bl_users)
+@lang.language()
+@safe_callback
+async def _settings(_, query: types.CallbackQuery):
+    await query.answer()
+
+    if query.message.chat.type == "private":
+        return
+
+    admin_only = await db.get_play_mode(query.message.chat.id)
+
+    try:
+        await query.edit_message_caption(
+            caption=query.lang["start_settings"].format(query.message.chat.title),
+            reply_markup=buttons.settings_markup(query.lang, admin_only, "en", query.message.chat.id),
+        )
+    except Exception:
+        try:
+            await query.edit_message_text(
+                text=query.lang["start_settings"].format(query.message.chat.title),
+                reply_markup=buttons.settings_markup(query.lang, admin_only, "en", query.message.chat.id),
+            )
+        except Exception:
+            pass
+
+
+@app.on_callback_query(filters.regex("^playmode") & ~app.bl_users)
+@lang.language()
+@safe_callback
+async def _playmode(_, query: types.CallbackQuery):
+    await query.answer()
+
+    if query.message.chat.type == "private":
+        return
+
+    if not await admin_check(query):
+        await query.answer("❌ You're not an admin.", show_alert=True)
+        return
+
+    chat_id = query.message.chat.id
+    admin_only = await db.get_play_mode(chat_id)
+    await db.set_play_mode(chat_id, not admin_only)
+
+    new_mode = "Admin Only" if not admin_only else "Everyone"
+    await query.answer(f"Play mode changed to: {new_mode}", show_alert=True)
+
+    admin_only = not admin_only
+    try:
+        await query.edit_message_caption(
+            caption=query.lang["start_settings"].format(query.message.chat.title),
             reply_markup=buttons.settings_markup(query.lang, admin_only, "en", chat_id),
         )
+    except Exception:
+        try:
+            await query.edit_message_text(
+                text=query.lang["start_settings"].format(query.message.chat.title),
+                reply_markup=buttons.settings_markup(query.lang, admin_only, "en", chat_id),
+            )
+        except Exception:
+            pass
