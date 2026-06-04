@@ -49,7 +49,14 @@ class Inline:
                     self.ikb(text="🔑 ᴀᴜᴛʜ", callback_data="help_auth"),
                 ],
                 [
+                    self.ikb(text="🔐 ꜱᴜᴅᴏ", callback_data="help_sudo"),
                     self.ikb(text="🚫 ʙʟᴀᴄᴋʟɪꜱᴛ", callback_data="help_blacklist"),
+                ],
+                [
+                    self.ikb(text="ℹ️ ɪɴꜰᴏ", callback_data="help_info"),
+                    self.ikb(text="✨ ꜰᴇᴀᴛᴜʀᴇꜱ", callback_data="help_features"),
+                ],
+                [
                     self.ikb(text="💡 ᴛɪᴘꜱ", callback_data="help_tips"),
                 ],
                 [self.ikb(text="← ʙᴀᴄᴋ ᴛᴏ ꜱᴛᴀʀᴛ", callback_data="start")],
