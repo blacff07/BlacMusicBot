@@ -19,7 +19,7 @@ def safe_callback(func):
         except Exception as e:
             logger.error(f"Error in callback {func.__name__}: {e}", exc_info=True)
             try:
-                await query.answer("❌ An error occurred. Please try again.", show_alert=True)
+                await query.answer("An error occurred. Please try again.", show_alert=True)
             except Exception:
                 pass
     return wrapper
@@ -78,26 +78,8 @@ async def _help_categories(_, query: types.CallbackQuery):
     
     category = query.data.replace("help_", "")
     
-    help_texts = {
-        "playback": query.lang.get("help_playback", "Coming soon..."),
-        "controls": query.lang.get("help_controls", "Coming soon..."),
-        "admin": query.lang.get("help_admins", "Coming soon..."),
-        "auth": query.lang.get("help_auth", "Coming soon..."),
-        "blacklist": query.lang.get("help_blacklist", query.lang.get("help_blchat", "Coming soon...")),
-        "filters": query.lang.get("help_filters", "Coming soon..."),
-        "tips": query.lang.get("help_tips", "Coming soon..."),
-        "admins": query.lang.get("help_admins", "Coming soon..."),
-        "bluser": query.lang.get("help_bluser", "Coming soon..."),
-        "blchat": query.lang.get("help_blchat", "Coming soon..."),
-        "gban": query.lang.get("help_gban", "Coming soon..."),
-        "loop": query.lang.get("help_loop", "Coming soon..."),
-        "play": query.lang.get("help_play", "Coming soon..."),
-        "queue": query.lang.get("help_queue", "Coming soon..."),
-        "shuffle": query.lang.get("help_shuffle", "Coming soon..."),
-        "seek": query.lang.get("help_seek", "Coming soon..."),
-    }
-    
-    text = help_texts.get(category, "Unknown category")
+    help_key = f"help_{category}"
+    text = query.lang.get(help_key, "Coming soon...")
     
     try:
         await query.edit_message_caption(
@@ -221,7 +203,7 @@ async def _playmode(_, query: types.CallbackQuery):
         return
 
     if not await admin_check(query):
-        await query.answer("❌ You're not an admin.", show_alert=True)
+        await query.answer("You're not an admin.", show_alert=True)
         return
 
     chat_id = query.message.chat.id
@@ -229,7 +211,7 @@ async def _playmode(_, query: types.CallbackQuery):
     await db.set_play_mode(chat_id, not admin_only)
 
     new_mode = "Admin Only" if not admin_only else "Everyone"
-    await query.answer(f"Play mode changed to: {new_mode}", show_alert=True)
+    await query.answer(f"Play mode: {new_mode}", show_alert=True)
 
     admin_only = not admin_only
     try:
