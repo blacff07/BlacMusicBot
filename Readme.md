@@ -1,8 +1,8 @@
 <img src="https://files.catbox.moe/fykkhm.jpg" alt="BlacMusic Banner" width="100%"/>
 
-# ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼ 🎵
-
 <div align="center">
+
+# ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼ 🎵
 
 [![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-blue?style=flat-square&logo=telegram)](https://t.me)
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-green?style=flat-square&logo=python)](https://www.python.org)
