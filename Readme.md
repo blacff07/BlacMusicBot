@@ -11,90 +11,48 @@
 [![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-blue?style=flat-square&logo=telegram)](https://t.me)
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-green?style=flat-square&logo=python)](https://www.python.org)
 [![MIT License](https://img.shields.io/badge/License-MIT-red?style=flat-square)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square)](https://github.com)
 
-A powerful Telegram music bot with voice chat support, advanced playlist management, and multi-tier access control.
+A powerful Telegram voice chat music bot with playlist support, group controls, and advanced playback features.
 
-[Features](#-features) • [Installation](#-installation) • [Setup](#-setup) • [Usage](#-usage) • [Troubleshooting](#-troubleshooting)
+[Quick Start](#-quick-start) • [Setup](#-setup) • [Commands](#-commands) • [Cookies](#-cookies) • [Hosting](#-hosting)
 
 </div>
 
 ---
 
-## ✨ Features
+## ✨ What This Bot Does
 
-🎶 **Music Playback**
-- Play songs from Telegram groups and channels
-- Direct YouTube URL support
-- Playlist management with queue system
-- High-quality audio streaming via py-tgcalls
-
-🔐 **Multi-Tier Access Control**
-- Free tier with basic functionality
-- Premium tier with extended features
-- Elite tier with priority playback
-- Owner-only administrative commands
-
-⚙️ **Advanced Features**
-- Smart caching system to reduce bandwidth
-- Automatic retry on connection failures
-- Per-group play mode settings (everyone/admin-only)
-- Comprehensive logging and error tracking
-- MongoDB database integration
-
-🛠️ **Developer Friendly**
-- Plugin-based architecture for easy extensions
-- RESTful command structure
-- Hot-reload capabilities via `/update`
-- Detailed error messages and debugging
+🎵 **Play Music** - Search and play songs from YouTube in voice chats
+👥 **Group Control** - Admins can restrict who can play music
+🔐 **User Permissions** - Authorize specific users without making them admins
+📻 **Radio & Playlists** - Stream radio stations and entire YouTube playlists
+⏪ **Full Playback Control** - Pause, resume, skip, seek, loop, shuffle
 
 ---
 
 ## 📋 Requirements
 
-- Python 3.8 or higher
-- MongoDB (local or cloud instance)
-- Git (for version updates)
-- Telegram Bot Token (from @BotFather)
-- Telegram Account for userbot (assistant account)
+- **Python** 3.8 or higher
+- **MongoDB** (local or cloud)
+- **Telegram Bot Token** (from @BotFather)
+- **Telegram Account** (for assistant userbot)
 
 ---
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### Step 1: Clone Repository
+### Step 1: Clone & Setup
 
 ```bash
 git clone https://github.com/yourusername/BlacMusicBot.git
 cd BlacMusicBot
+chmod +x QUICK_SETUP.sh
+./QUICK_SETUP.sh
 ```
 
-### Step 2: Create Virtual Environment
+### Step 2: Create .env File
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-On Windows:
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
-
-### Step 3: Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## ⚙️ Setup
-
-### 1. Environment Variables
-
-Create `.env` file in root directory:
+Create a file named `.env` in the root directory:
 
 ```env
 API_ID=your_api_id
@@ -103,122 +61,167 @@ BOT_TOKEN=your_bot_token
 ASSISTANT_ID=assistant_user_id
 DB_URL=mongodb_connection_string
 SOURCE_URL=https://github.com/yourusername/BlacMusicBot.git
-SUDO_USERS=user_id_1,user_id_2
-START_IMG=https://image_url
-HELP_IMG=https://image_url
-COOKIES_URL=https://cookie_url
+COOKIES_URL=https://your-cookies-url.com/cookies.txt
+SUDO_USERS=your_user_id
+SUPPORT_CHANNEL=https://t.me/yourchannel
+SUPPORT_CHAT=https://t.me/yourchat
 LANGUAGE=en
 ```
 
-### 2. Database Setup
+### Step 3: Start Bot
 
-If using local MongoDB:
+```bash
+python -m BlacMusic
+```
+
+Bot is now online! 🎉
+
+---
+
+## ⚙️ Setup Details
+
+### Get API Credentials
+
+1. **API ID & Hash:**
+   - Go to https://my.telegram.org
+   - Create an app
+   - Copy `api_id` and `api_hash`
+
+2. **Bot Token:**
+   - Message @BotFather on Telegram
+   - Send `/newbot`
+   - Follow instructions and copy token
+
+3. **Assistant ID:**
+   - Message @userinfobot on Telegram
+   - Copy your User ID
+
+### Database Setup
+
+**Local MongoDB:**
 ```bash
 mongod
 ```
 
-Or use MongoDB Atlas (cloud):
-```
-mongodb+srv://username:password@cluster.mongodb.net/blacmusic
-```
+**Cloud MongoDB (Atlas):**
+- Create account at https://www.mongodb.com/cloud/atlas
+- Create cluster
+- Get connection string: `mongodb+srv://user:password@cluster.mongodb.net/blacmusic`
 
-### 3. Get Required Credentials
+### Cookies for YouTube (Optional but Recommended)
 
-**API ID & API Hash:**
-- Go to https://my.telegram.org
-- Create application
-- Copy API ID and API Hash
+YouTube blocks downloads from servers. Cookies bypass this.
 
-**Bot Token:**
-- Message @BotFather on Telegram
-- Send `/newbot`
-- Choose name and username
-- Copy token
+**Get Cookies:**
 
-**Assistant Account:**
-- Telegram account ID (not bot)
-- Used for playlist management
-- Get from @userinfobot
+#### Windows/Mac/Linux
 
----
+1. Open **Chrome** or **Firefox**
+2. Go to https://www.youtube.com
+3. **Log in** to your account
+4. Press **F12** (Developer Tools)
+5. Go to **Storage/Application** tab
+6. Click **Cookies** → **https://www.youtube.com**
+7. Copy all cookie data
+8. Save as `cookies.txt`
 
-## 📱 Usage
+#### Android
 
-### Starting the Bot
+**Using Firefox:**
+1. Install Firefox
+2. Go to youtube.com and log in
+3. Install extension: **"Cookies.txt"**
+4. Export cookies to file
 
-Using the shell script (recommended):
+**Using Kiwi Browser:**
+1. Install Kiwi Browser (plays extensions)
+2. Install **"Cookie Editor"** extension
+3. Go to youtube.com and log in
+4. Click extension → Export
+
+**Place Cookies:**
 ```bash
-chmod +x QUICK_SETUP.sh
-./QUICK_SETUP.sh
-python -m BlacMusic
-```
-
-Or manually:
-```bash
-source venv/bin/activate
-python -m BlacMusic
-```
-
-### Bot Commands
-
-**Music Commands**
-- `/play <song_name>` - Search and play song
-- `/play <youtube_url>` - Play from direct YouTube link
-- `/playlist <url>` - Add entire playlist to queue
-- `/pause` - Pause current playback
-- `/resume` - Resume playback
-- `/skip` - Skip to next song
-- `/queue` - Show current queue
-
-**Admin Commands** (sudo users only)
-- `/restart` - Restart bot cleanly
-- `/update` - Pull latest changes and restart
-- `/logs` - Get bot logs
-- `/logger on/off` - Enable/disable logging
-
-**Group Settings**
-- `/playmode` - Toggle play mode (everyone/admin-only)
-- `/settings` - Show group settings
-
----
-
-## 🔧 QUICK_SETUP.sh Usage
-
-The shell script automates the entire setup process:
-
-```bash
-chmod +x QUICK_SETUP.sh
-./QUICK_SETUP.sh
-```
-
-**What it does:**
-1. Checks for .env file with SOURCE_URL
-2. Clones repository (if not already cloned)
-3. Removes old virtual environment
-4. Creates fresh venv
-5. Installs all dependencies
-6. Verifies installation
-7. Activates venv automatically
-
-**After script completes:**
-```bash
-python -m BlacMusic
+mkdir -p BlacMusic/cookies
+cp cookies.txt BlacMusic/cookies/cookies.txt
 ```
 
 ---
 
-## 🌐 Hosting Guide
+## 📱 Commands
 
-### Option 1: Local Machine (Development)
+### Playback (Anyone)
+
+```
+/play song_name           - Search and play song
+/play youtube_url         - Play direct YouTube link
+/playlist url             - Add entire playlist
+/pause                    - Pause music
+/resume                   - Resume music
+/skip                     - Next song
+/stop                     - Stop playing
+/queue                    - Show queue
+/now                      - Current song
+/seek 120                 - Jump to 2 minutes
+/loop [off/one/all]       - Loop mode
+/shuffle                  - Randomize queue
+```
+
+### Admin Commands
+
+```
+/playmode                 - Toggle everyone/admin-only mode
+/settings                 - View group settings
+/auth @user               - Allow user to control music
+/unauth @user             - Remove user permission
+/authlist                 - Show authorized users
+```
+
+### Owner Commands (Sudo)
+
+```
+/addsudo @user            - Add bot admin
+/delsudo @user            - Remove bot admin
+/sudolist                 - Show all bot admins
+/restart                  - Restart bot
+/update                   - Pull latest & restart
+/gban user_id             - Global ban user
+/ungban user_id           - Unban user
+/logs                     - Get bot logs
+```
+
+### Info Commands
+
+```
+/start                    - Welcome message
+/help                     - All commands
+/ping                     - Check bot response
+/stats                    - Bot statistics
+```
+
+---
+
+## 🍪 YouTube Cookies
+
+Cookies expire after ~1 year. When you get "Sign in to confirm you're not a bot" error:
+
+1. Export fresh cookies (repeat above steps)
+2. Replace `BlacMusic/cookies/cookies.txt`
+3. Run `/update` command in Telegram
+
+---
+
+## 🌐 Hosting
+
+### Local Machine
 
 ```bash
 ./QUICK_SETUP.sh
 python -m BlacMusic
 ```
 
-Keep terminal window open. Bot stays online while running.
+Keep terminal open. Bot stays online while running.
 
-### Option 2: VPS/Cloud Server
+### VPS/Cloud Server (Ubuntu)
 
 **Initial Setup:**
 ```bash
@@ -229,53 +232,34 @@ cd BlacMusicBot
 ./QUICK_SETUP.sh
 ```
 
-**Run with Screen (persistent):**
+**Run with Screen (Keep Online):**
 ```bash
 screen -S blacmusic
 python -m BlacMusic
 ```
 
-Press `Ctrl+A` then `D` to detach from screen.
+Press `Ctrl+A` then `D` to detach. Resume with: `screen -r blacmusic`
 
-**Resume session:**
-```bash
-screen -r blacmusic
-```
-
-**Run with Nohup (persistent):**
+**Run with Nohup (Keep Online):**
 ```bash
 nohup python -m BlacMusic > bot.log 2>&1 &
-```
-
-**Check status:**
-```bash
 tail -f bot.log
 ```
 
-### Option 3: Docker (Recommended for Scale)
+### Docker
 
-Create `Dockerfile`:
-```dockerfile
-FROM python:3.9-slim
-WORKDIR /app
-RUN apt-get update && apt-get install -y git
-COPY . .
-RUN pip install -r requirements.txt
-CMD ["python", "-m", "BlacMusic"]
-```
-
-Build and run:
 ```bash
 docker build -t blacmusic .
 docker run -d --name blacmusic --env-file .env blacmusic
 ```
 
-### Option 4: Systemd Service (Production Linux)
+### Production (Systemd Service)
 
 Create `/etc/systemd/system/blacmusic.service`:
+
 ```ini
 [Unit]
-Description=BlacMusic Telegram Bot
+Description=BlacMusic Bot
 After=network.target
 
 [Service]
@@ -290,7 +274,7 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-Enable and start:
+Enable & start:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable blacmusic
@@ -300,18 +284,18 @@ sudo systemctl start blacmusic
 Check status:
 ```bash
 sudo systemctl status blacmusic
-sudo journalctl -u blacmusic -f
 ```
 
 ---
 
-## 🔄 Update Process
+## 🔄 Update Bot
 
-**Via Telegram (easiest):**
+**Via Telegram:**
 ```
-Send: /update
-Bot automatically pulls latest code and restarts
+/update
 ```
+
+Bot automatically pulls latest code and restarts.
 
 **Manually:**
 ```bash
@@ -324,71 +308,104 @@ python -m BlacMusic
 
 ## 🐛 Troubleshooting
 
-**Bot won't start**
+### "Sign in to confirm you're not a bot"
+
+Solution: Add cookies.txt
+```bash
+# 1. Export cookies (see Cookies section)
+# 2. Place in BlacMusic/cookies/cookies.txt
+# 3. Run /update in Telegram
+```
+
+### Bot won't start
+
 ```bash
 python3 -c "from BlacMusic import app; print('OK')"
 pip install --upgrade -r requirements.txt
+./QUICK_SETUP.sh
 ```
 
-**Import errors**
+### MongoDB connection fails
+
+- Check connection string in .env
+- Verify network access in MongoDB Atlas
+- Test: `mongosh "mongodb+srv://..."`
+
+### Import errors
+
 ```bash
 deactivate
 rm -rf venv
 ./QUICK_SETUP.sh
 ```
 
-**MongoDB connection fails**
-- Verify connection string in .env
-- Check firewall settings
-- Test connection: `mongo "your_connection_string"`
+### Check logs
 
-**Song search returns no results**
-- Check internet connection
-- Verify YouTube availability in region
-- Try direct YouTube URL instead
-
-**Bot doesn't respond**
-- Check bot token is correct
-- Verify bot is added to group/channel
-- Check logs: `/logs` command
-
-**venv errors after git clone**
 ```bash
-./QUICK_SETUP.sh
+tail -f log.txt
 ```
+
+Look for error messages with timestamps.
 
 ---
 
-## 📚 Project Structure
+## 📁 Project Structure
 
 ```
 BlacMusicBot/
 ├── BlacMusic/
-│   ├── __main__.py          # Entry point
-│   ├── core/                # Core modules
-│   │   ├── youtube.py       # YouTube search & download
-│   │   └── ...
-│   ├── plugins/             # Telegram commands
-│   │   ├── playback/        # Play, pause, skip
-│   │   ├── admin/           # Admin commands
-│   │   └── ...
-│   ├── helpers/             # Utilities
-│   └── config.py            # Configuration
-├── requirements.txt         # Dependencies
-├── .env                     # Environment variables
-├── QUICK_SETUP.sh          # Setup script
-└── README.md               # This file
+│   ├── __main__.py           - Entry point
+│   ├── core/                 - YouTube, database
+│   ├── plugins/              - Commands
+│   ├── helpers/              - Utilities
+│   ├── cookies/              - cookies.txt goes here
+│   └── locales/              - Language files
+├── requirements.txt          - Dependencies
+├── .env                      - Configuration
+├── QUICK_SETUP.sh           - Setup script
+└── README.md                - This file
 ```
 
 ---
 
-## 🔐 Security Notes
+## 🔐 Security
 
-- Never commit `.env` file to git
-- Use strong MongoDB passwords
-- Restrict SUDO_USERS to trusted users only
-- Keep API credentials private
-- Regularly update dependencies
+### Do's ✅
+- Use dedicated YouTube account (not personal)
+- Keep `.env` file private
+- Add to `.gitignore`:
+  ```
+  .env
+  BlacMusic/cookies/
+  cookies.txt
+  log.txt
+  ```
+- Use strong passwords
+- Enable 2FA on accounts
+
+### Don'ts ❌
+- Don't commit cookies to GitHub
+- Don't share .env publicly
+- Don't use personal YouTube account
+- Don't upload to public servers unencrypted
+
+---
+
+## 📚 Useful Links
+
+- **Telegram Bot API:** https://core.telegram.org/bots/api
+- **MongoDB Atlas:** https://www.mongodb.com/cloud/atlas
+- **My Telegram ID:** https://t.me/userinfobot
+- **Get API Credentials:** https://my.telegram.org
+
+---
+
+## 💬 Support
+
+For issues:
+1. Check logs: `tail -f log.txt`
+2. Read troubleshooting section above
+3. Create GitHub issue with error message
 
 ---
 
@@ -398,31 +415,10 @@ This project is licensed under the MIT License - see LICENSE file for details.
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open Pull Request
-
----
-
-## 💬 Support
-
-For issues and questions:
-- Check troubleshooting section above
-- Review existing GitHub issues
-- Create new GitHub issue with detailed information
-- Contact bot developer via Telegram
-
----
-
 <div align="center">
 
 **Made with ❤️ for music lovers**
 
-⭐ If you find this project useful, please give it a star!
+⭐ Star this repo if you find it useful!
 
 </div>
