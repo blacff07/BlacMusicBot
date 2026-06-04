@@ -1,8 +1,4 @@
-<div align="center">
-
 <img src="https://files.catbox.moe/fykkhm.jpg" alt="BlacMusic Banner" width="100%"/>
-
-<br/>
 
 # ˹ʙʟᴀᴄ ᴍᴜꜱɪᴄ˼ 🎵
 
