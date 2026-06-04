@@ -37,7 +37,7 @@ class Inline:
 
     def help_markup(self, _lang, back=False):
         if back:
-            rows = [[self.ikb(text="ʙᴀᴄᴋ", callback_data="help_main")]]
+            rows = [[self.ikb(text="← ʙᴀᴄᴋ", callback_data="help")]]
         else:
             rows = [
                 [
@@ -45,14 +45,14 @@ class Inline:
                     self.ikb(text="⏱️ ᴄᴏɴᴛʀᴏʟꜱ", callback_data="help_controls"),
                 ],
                 [
-                    self.ikb(text="👑 ᴀᴅᴍɪɴ", callback_data="help_admin"),
-                    self.ikb(text="🔧 ꜱᴇᴛᴛɪɴɢꜱ", callback_data="help_filters"),
+                    self.ikb(text="👑 ᴀᴅᴍɪɴꜱ", callback_data="help_admins"),
+                    self.ikb(text="🔑 ᴀᴜᴛʜ", callback_data="help_auth"),
                 ],
                 [
                     self.ikb(text="🚫 ʙʟᴀᴄᴋʟɪꜱᴛ", callback_data="help_blacklist"),
                     self.ikb(text="💡 ᴛɪᴘꜱ", callback_data="help_tips"),
                 ],
-                [self.ikb(text="ʙᴀᴄᴋ ᴛᴏ ꜱᴛᴀʀᴛ", callback_data="start")],
+                [self.ikb(text="← ʙᴀᴄᴋ ᴛᴏ ꜱᴛᴀʀᴛ", callback_data="start")],
             ]
         return self.ikm(rows)
 
@@ -85,10 +85,10 @@ class Inline:
         play_mode = "ᴀᴅᴍɪɴ ᴏɴʟʏ" if admin_only else "ᴇᴠᴇʀʏᴏɴᴇ"
         return self.ikm([
             [
-                self.ikb(text=f"ᴘʟᴀʏ ᴍᴏᴅᴇ: {play_mode}", callback_data=f"toggle_playmode {chat_id}"),
+                self.ikb(text=f"ᴘʟᴀʏ ᴍᴏᴅᴇ: {play_mode}", callback_data=f"playmode {chat_id}"),
             ],
             [
-                self.ikb(text="ʙᴀᴄᴋ", callback_data="start"),
+                self.ikb(text="← ʙᴀᴄᴋ", callback_data="start"),
             ],
         ])
 
@@ -96,7 +96,7 @@ class Inline:
         if pm:
             rows = [
                 [
-                    self.ikb(text="❓ ʜᴇʟᴘ", callback_data="help_main"),
+                    self.ikb(text="❓ ʜᴇʟᴘ", callback_data="help"),
                     self.ikb(text="⚙️ ꜱᴇᴛᴛɪɴɢꜱ", callback_data="settings"),
                 ],
                 [
