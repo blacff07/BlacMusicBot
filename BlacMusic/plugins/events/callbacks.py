@@ -77,7 +77,6 @@ async def _help_categories(_, query: types.CallbackQuery):
     await query.answer()
     
     category = query.data.replace("help_", "")
-    
     help_key = f"help_{category}"
     text = query.lang.get(help_key, "Coming soon...")
     
@@ -202,7 +201,8 @@ async def _playmode(_, query: types.CallbackQuery):
     if query.message.chat.type == "private":
         return
 
-    if not await admin_check(query):
+    is_admin = await admin_check(query)
+    if not is_admin:
         await query.answer("You're not an admin.", show_alert=True)
         return
 
