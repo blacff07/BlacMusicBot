@@ -118,9 +118,6 @@ class YouTube:
         self.checked = True
         if saved_count > 0:
             logger.info(f"Cookies from URL loaded: {saved_count} file(s)")
-        else:
-            logger.warning("Failed to load cookies from URL, will try local cookies.txt")
-            self.checked = False
 
     def is_network_stream(self, url: str) -> bool:
         url = url.lower()
