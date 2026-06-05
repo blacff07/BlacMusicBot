@@ -6,7 +6,7 @@ from pyrogram import filters, types
 from pyrogram.errors import FloodWait, QueryIdInvalid
 
 from BlacMusic import tune, app, config, db, lang, logger, queue, tg, yt
-from BlacMusic.helpers import admin_check, buttons, can_manage_vc
+from BlacMusic.helpers import buttons, can_manage_vc
 
 
 def safe_callback(func):
@@ -201,12 +201,13 @@ async def _playmode(_, query: types.CallbackQuery):
     if query.message.chat.type == "private":
         return
 
-    is_admin = await admin_check(query)
-    if not is_admin:
+    chat_id = query.message.chat.id
+    admins = await db.get_admins(chat_id)
+    
+    if query.from_user.id not in admins and query.from_user.id not in app.sudoers:
         await query.answer("You're not an admin.", show_alert=True)
         return
 
-    chat_id = query.message.chat.id
     admin_only = await db.get_play_mode(chat_id)
     await db.set_play_mode(chat_id, not admin_only)
 
