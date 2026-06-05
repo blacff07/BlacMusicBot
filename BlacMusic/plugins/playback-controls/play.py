@@ -7,6 +7,7 @@ from BlacMusic.helpers import buttons, utils
 from BlacMusic.helpers._play import checkUB
 import asyncio
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -104,23 +105,20 @@ async def play(
     if not query:
         return await safe_reply(m, m.lang.get("play_no_query", "No query provided"))
 
-    import random as _rnd
     _EMOJI_POOL = ["🌷","🌹","👀","👁","👣","🫶","🫰","🎩","🦋","🕸",
                    "🐾","💫","💥","❄️","🍾","🥂","🧃","🍭","🎗","🎨",
                    "🚀","🎢","💡","💣","🧨","🔮","🧪","🌡","🎉",
                    "🎊","🪄","💌","🪩","🧮","❤️‍🩹","💝","💗","💞","💔",
                    "🖤","💢","💯","🎶","🎵","🔎","🦠","💥"]
     
-    play_emoji = _rnd.choice(_EMOJI_POOL)
-    
-    _search_msg = f"{play_emoji} 🔍 <b>Searching...</b>"
+    play_emoji = random.choice(_EMOJI_POOL)
     
     try:
-        sent = await safe_reply(m, _search_msg)
+        sent = await safe_reply(m, play_emoji)
     except FloodWait as e:
         await asyncio.sleep(e.value)
         try:
-            sent = await safe_reply(m, _search_msg)
+            sent = await safe_reply(m, play_emoji)
         except Exception:
             return
     except Exception:
@@ -222,7 +220,7 @@ async def play(
 )
 @lang.language()
 async def play_hndlr(client, message: types.Message):
-    await checkUB(client, message)
+    await checkUB(message)
 
     cmd = message.command[0].lower()
     force = "force" in cmd
