@@ -10,12 +10,17 @@ from BlacMusic import config, logger
 
 async def save_cookies(url):
     if not url:
-        logger.warning("⚠️ COOKIES_URL not set in .env")
+        logger.warning("COOKIES_URL not set in .env")
         return
     
     try:
         cookies_dir = Path("BlacMusic/cookies")
         cookies_dir.mkdir(exist_ok=True)
+        
+        local_cookies = cookies_dir / "cookies.txt"
+        if local_cookies.exists():
+            logger.info("Using local cookies.txt")
+            return
         
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
@@ -23,7 +28,7 @@ async def save_cookies(url):
                     content = await response.read()
                     
                     if not content or b"Netscape" not in content:
-                        logger.warning("⚠️ Invalid cookies format from URL")
+                        logger.warning("Invalid cookies format from URL")
                         return
                     
                     cookies_file = cookies_dir / "cookies.txt"
@@ -31,13 +36,13 @@ async def save_cookies(url):
                         f.write(content)
                     
                     file_size = len(content)
-                    logger.info(f"✅ Cookies loaded from URL: {file_size} bytes")
+                    logger.info(f"Cookies loaded from URL: {file_size} bytes")
                 else:
-                    logger.warning(f"⚠️ Failed to download cookies: HTTP {response.status}")
+                    logger.warning(f"Failed to download cookies: HTTP {response.status}")
     except asyncio.TimeoutError:
-        logger.warning("⚠️ Cookies download timeout")
+        logger.warning("Cookies download timeout")
     except Exception as e:
-        logger.warning(f"⚠️ Error loading cookies: {e}")
+        logger.warning(f"Error loading cookies: {e}")
 
 
 async def search(query: str):
