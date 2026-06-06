@@ -219,9 +219,8 @@ async def play(
     filters.command(["play", "vplay", "cplay", "cvplay", "playforce", "vplayforce", "cplayforce", "cvplayforce"], prefixes=["/", "!", "."]) & ~app.bl_users
 )
 @lang.language()
+@checkUB
 async def play_hndlr(client, message: types.Message):
-    await checkUB(message)
-
     cmd = message.command[0].lower()
     force = "force" in cmd
     video = "v" in cmd
