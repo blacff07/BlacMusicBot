@@ -131,6 +131,37 @@ class YouTube:
         else:
             logger.error("No cookies saved! Check COOKIES_URL in .env. YouTube downloads will fail!")
 
+    def url(self, message_1: types.Message) -> Union[str, None]:
+        messages = [message_1]
+        link = None
+        if message_1.reply_to_message:
+            messages.append(message_1.reply_to_message)
+
+        for message in messages:
+            text = message.text or message.caption or ""
+
+            if message.entities:
+                for entity in message.entities:
+                    if entity.type == enums.MessageEntityType.URL:
+                        link = text[entity.offset: entity.offset + entity.length]
+                        break
+
+            if message.caption_entities:
+                for entity in message.caption_entities:
+                    if entity.type == enums.MessageEntityType.TEXT_LINK:
+                        link = entity.url
+                        break
+
+        if link is None:
+            return None
+
+        if not link.startswith("http"):
+            link = "https://" + link
+
+        if self.valid(link):
+            return link
+        return None
+
     def is_network_stream(self, url: str) -> bool:
         url = url.lower()
         return (
