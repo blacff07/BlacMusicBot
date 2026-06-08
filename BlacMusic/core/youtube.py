@@ -100,7 +100,10 @@ class YouTube:
         for url in urls:
             try:
                 path = f"BlacMusic/cookies/cookie{random.randint(10000, 99999)}.txt"
-                link = url.replace("me/", "me/raw/")
+                link = url.strip()
+                if "pastebin.com" in link:
+                    if "/raw/" not in link:
+                        link = link.replace("pastebin.com/", "pastebin.com/raw/")
                 async with aiohttp.ClientSession() as session:
                     async with session.get(link) as resp:
                         if resp.status != 200:
