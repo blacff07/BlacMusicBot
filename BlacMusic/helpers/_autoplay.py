@@ -5,7 +5,7 @@
 import asyncio
 import random
 
-from youtubesearchpython import VideosSearch
+from py_yt import VideosSearch
 
 # NOTE: All BlacMusic imports are intentionally lazy (inside functions)
 # to avoid circular import since calls.py imports this at module level.
@@ -41,7 +41,6 @@ def _get_utils():
 async def _search_multi(base_query: str, count: int = 3, chat_id: int = 0):
     from BlacMusic import logger
     from BlacMusic.helpers._dataclass import Track
-    from BlacMusic.helpers._utilities import Utilities
 
     utils = Utilities()
     tracks = []
