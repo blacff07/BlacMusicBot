@@ -78,6 +78,9 @@ async def cancel_dl(_, query: types.CallbackQuery):
 @safe_callback
 async def _controls(_, query: types.CallbackQuery):
     args = query.data.split()
+    if len(args) < 3:
+        await query.answer("Invalid button data")
+        return
     action, chat_id = args[1], int(args[2])
     qaction = len(args) == 4
     user = query.from_user.mention
