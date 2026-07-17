@@ -1,0 +1,54 @@
+# ==============================================================================
+# pause.py - Pause Playback Command
+# ==============================================================================
+# This plugin handles pausing the current voice chat playback.
+#
+# Commands:
+# - /pause - Pause current playback
+#
+# Requirements:
+# - User must be admin or authorized user
+# - Music must be currently playing
+# ==============================================================================
+
+import logging
+from pyrogram import filters, types
+from pyrogram.errors import ChatSendPlainForbidden, ChatWriteForbidden
+
+from BlacMusic import tune, app, db, lang
+from BlacMusic.helpers import buttons, can_manage_vc, utils
+
+logger = logging.getLogger(__name__)
+
+
+@app.on_message(filters.command(["pause"]) & ~app.bl_users)
+@lang.language()
+@can_manage_vc
+async def _pause(_, m: types.Message) -> None:
+    if await utils.group_only_guard(m):
+        return
+
+    await utils.delete_command(m)
+
+    if not await db.get_call(m.chat.id):
+        try:
+            await m.reply_text(m.lang["not_playing"])
+        except (ChatSendPlainForbidden, ChatWriteForbidden):
+            pass
+        return
+
+    if not await db.playing(m.chat.id):
+        try:
+            await m.reply_text(m.lang["play_already_paused"])
+        except (ChatSendPlainForbidden, ChatWriteForbidden):
+            pass
+        return
+
+    await tune.pause(m.chat.id)
+    try:
+        await m.reply_text(
+            text=m.lang["play_paused"].format(m.from_user.mention),
+            reply_markup=buttons.controls(m.chat.id),
+        )
+    except (ChatSendPlainForbidden, ChatWriteForbidden):
+        logger.warning("Cannot send text in media-only chat")

@@ -1,0 +1,18 @@
+# Netscape HTTP Cookie File
+# http://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Change with real cookies.
+
+.youtube.com	TRUE	/	TRUE	1767225600	CONSENT	YES+cb.20210328-17-p0.en+FX+410
+.youtube.com	TRUE	/	TRUE	1767225600	__Secure-1PAPISID	aBcDeFgHiJkLmNoPqRsT/UvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjK
+.youtube.com	TRUE	/	TRUE	1767225600	__Secure-3PAPISID	aBcDeFgHiJkLmNoPqRsT/UvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjK
+.youtube.com	TRUE	/	TRUE	1767225600	HSID	aBcDeFgHiJkLmNoPqRsT
+.youtube.com	TRUE	/	TRUE	1767225600	SSID	UvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz
+.youtube.com	TRUE	/	TRUE	1767225600	APISID	aBcDeFgHiJkLmNoPqRsT/UvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOp
+.youtube.com	TRUE	/	FALSE	1767225600	SID	aBcDeFgHiJkLmNoPqRsT_UvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQr
+.youtube.com	TRUE	/	FALSE	1767225600	__Secure-1PSID	aBcDeFgHiJkLmNoPqRsT_UvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQr
+.youtube.com	TRUE	/	FALSE	1767225600	__Secure-3PSID	aBcDeFgHiJkLmNoPqRsT_UvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQr
+.youtube.com	TRUE	/	FALSE	1767225600	LOGIN_INFO	WwEXmAZWI4dVy6_7mZvR8vCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYzAbCdEfGhIjKlMnOpQrStUvWxYz
+.youtube.com	TRUE	/	TRUE	1767225600	PREF	yt-dark-mode=true&f5=4&cvip=1&yt-uix-thumb-display=shotwell
+.youtube.com	TRUE	/	FALSE	1767225600	YSC	aBcDeFgHiJkLmNoPqRsT
+.youtube.com	TRUE	/	FALSE	1767225600	VISITOR_INFO1_LIVE	aBcDeFgHiJkLmNoPqRsT
+.youtube.com	TRUE	/	FALSE	1767225600	DEVICE_ID	aBcDeFgHiJkLmNoPqRsT_UvWxYzAbCdEfGhIjKlMnOpQr

@@ -1,0 +1,78 @@
+# ==============================================================================
+# queue.py - Queue Display Command
+# ==============================================================================
+# This plugin displays the current queue and now playing information.
+#
+# Commands:
+# - /queue - Show current queue
+# - /playing - Same as /queue
+#
+# Displays:
+# - Currently playing track with thumbnail
+# - Track title, duration, user who requested
+# - Upcoming tracks in queue (expandable list)
+# - Queue length and total duration
+# ==============================================================================
+
+from pyrogram import filters, types
+
+from BlacMusic import app, config, db, lang, queue
+from BlacMusic.helpers import Track, buttons, thumb, utils
+
+
+@app.on_message(filters.command(["queue", "playing"]) & ~app.bl_users)
+@lang.language()
+async def _queue_func(_, m: types.Message) -> None:
+    if await utils.group_only_guard(m):
+        return
+
+    await utils.delete_command(m)
+
+    if not await db.get_call(m.chat.id):
+        await m.reply_text(m.lang["not_playing"])
+        return
+
+    _reply = await m.reply_text(m.lang["queue_fetching"])
+    _queue = queue.get_queue(m.chat.id)
+    if not _queue:
+        # Call marked active but nothing queued (rare race right after the
+        # last track finished) - avoid an IndexError on _queue[0] below.
+        await utils.safe_edit(_reply, m.lang["not_playing"])
+        return
+
+    _media = _queue[0]
+    _thumb = (
+        await thumb.generate(_media)
+        if isinstance(_media, Track)
+        else config.DEFAULT_THUMB
+    )
+    _text = m.lang["queue_curr"].format(
+        _media.url,
+        _media.title[:50],
+        _media.duration,
+        _media.user,
+    )
+    _queue.pop(0)
+
+    if _queue:
+        _text += "<blockquote expandable>"
+        for i, media in enumerate(_queue, start=1):
+            if i == 15:
+                break
+            _text += m.lang["queue_item"].format(
+                i, media.title, media.duration  # Show 1, 2, 3... for queued songs
+            )
+        _text += "</blockquote>"
+
+    _playing = await db.playing(m.chat.id)
+    await _reply.edit_media(
+        media=types.InputMediaPhoto(
+            media=_thumb,
+            caption=_text,
+        ),
+        reply_markup=buttons.queue_markup(
+            m.chat.id,
+            m.lang["playing"] if _playing else m.lang["paused"],
+            _playing,
+        ),
+    )

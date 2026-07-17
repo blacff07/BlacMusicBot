@@ -1,0 +1,87 @@
+# ==============================================================================
+# iquery.py - Inline Query Handler
+# ==============================================================================
+# This plugin handles inline mode queries (@botname <query>).
+#
+# Features:
+# - Search YouTube videos in inline mode
+# - Display up to 15 results
+# - Show thumbnails, duration, views, channel info
+# - Users can select a video to share in any chat
+#
+# Usage: @BlacMusicBot search query
+# ==============================================================================
+
+# ==============================================================================
+# iquery.py - Inline Query Handler
+# ==============================================================================
+# This plugin handles inline mode queries (@botname <query>).
+#
+# Features:
+# - Search YouTube videos in inline mode
+# - Display up to 15 results
+# - Show thumbnails, duration, views, channel info
+# - Users can select a video to share in any chat
+#
+# Usage: @BlacMusicBot search query
+# ==============================================================================
+
+from html import escape
+
+from py_yt import VideosSearch
+from pyrogram import types
+
+from BlacMusic import app
+from BlacMusic.helpers import buttons
+
+
+@app.on_inline_query(~app.bl_users)
+async def inline_query_handler(_, query: types.InlineQuery) -> None:
+    text = query.query.strip().lower()
+    if not text:
+        return
+
+    try:
+        search = VideosSearch(text, limit=15)
+        results = (await search.next()).get("result", [])
+
+        answers = []
+        for video in results:
+            # YouTube metadata is untrusted input - escape before it goes into
+            # an HTML-parsed caption, otherwise a title containing '<' or '&'
+            # could break formatting or inject markup.
+            title = escape(video.get("title", "Unknown Title").title())
+            duration = escape(video.get("duration", "N/A"))
+            views = escape(video.get("viewCount", {}).get("short", "N/A"))
+            thumbnail = video.get("thumbnails", [{}])[
+                0].get("url", "").split("?")[0]
+            channel = escape(video.get("channel", {}).get("name", "Unknown Channel"))
+            channellink = video.get("channel", {}).get(
+                "link", "https://youtube.com")
+            link = video.get("link", "https://youtube.com")
+            published = escape(video.get("publishedTime", "N/A"))
+
+            description = f"{views} | {duration} | {channel} | {published}"
+            caption = (
+                f"<b>Title:</b> <a href='{link}'>{title[:250]}</a>\n\n"
+                f"<b>Duration:</b> {duration}\n"
+                f"<b>Views:</b> <code>{views}</code>\n"
+                f"<b>Channel:</b> <a href='{channellink}'>{channel}</a>\n"
+                f"<b>Published:</b> {published}\n\n"
+                f"<u><i>Fetched by {app.name}</i></u>"
+            )
+
+            answers.append(
+                types.InlineQueryResultPhoto(
+                    photo_url=thumbnail,
+                    title=title,
+                    description=description,
+                    caption=caption,
+                    reply_markup=buttons.yt_key(link),
+                )
+            )
+
+        if answers:
+            await app.answer_inline_query(query.id, results=answers, cache_time=5)
+    except Exception:
+        pass
